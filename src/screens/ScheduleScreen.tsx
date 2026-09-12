@@ -259,7 +259,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.md,
   },
-  list: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  list: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    // Keeps rows anchored under the week strip instead of centring in the track.
+    flexGrow: 1,
+    justifyContent: 'flex-start',
+  },
   fab: {
     position: 'absolute',
     right: spacing.lg,

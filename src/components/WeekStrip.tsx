@@ -117,6 +117,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: GAP,
     paddingVertical: spacing.sm,
+    // Without this the web ScrollView stretches each day to the full track height.
+    alignItems: 'flex-start',
   },
   day: {
     width: DAY_WIDTH,
