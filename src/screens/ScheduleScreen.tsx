@@ -175,6 +175,7 @@ export function ScheduleScreen() {
       <WeekStrip selected={selectedDate} onSelect={setSelectedDate} markedDays={markedDays} />
 
       <FlatList
+        style={styles.listBox}
         data={tasks}
         keyExtractor={(item) => `${item.id}:${item.dayKey}`}
         renderItem={({ item }) => (
@@ -259,6 +260,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.md,
   },
+  listBox: { flex: 1 },
   list: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,

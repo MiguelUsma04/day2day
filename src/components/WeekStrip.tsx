@@ -7,6 +7,7 @@ import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/to
 import { addDays, dayShort, isSameDay, toDayKey } from '../utils/date';
 
 const DAY_WIDTH = 52;
+const DAY_HEIGHT = 72;
 const GAP = spacing.sm;
 /** Two weeks back, six forward — enough to plan ahead without an endless rail. */
 const RANGE_BACK = 14;
@@ -46,6 +47,7 @@ export function WeekStrip({ selected, onSelect, markedDays }: Props) {
       ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.strip}
       contentContainerStyle={styles.content}
     >
       {days.map((day) => {
@@ -113,6 +115,8 @@ export function WeekStrip({ selected, onSelect, markedDays }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // Fixed height stops the strip from claiming the list's vertical space.
+  strip: { flexGrow: 0, flexShrink: 0, height: DAY_HEIGHT + spacing.sm * 2 },
   content: {
     paddingHorizontal: spacing.lg,
     gap: GAP,
@@ -122,7 +126,8 @@ const styles = StyleSheet.create({
   },
   day: {
     width: DAY_WIDTH,
-    minHeight: TOUCH_TARGET + 22,
+    height: DAY_HEIGHT,
+    minHeight: TOUCH_TARGET,
     borderRadius: radius.lg,
     borderWidth: 1,
     alignItems: 'center',

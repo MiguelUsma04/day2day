@@ -27,9 +27,12 @@ import {
   type TaskInstance,
   type Weekday,
 } from '../types/task';
+import { formatDuration } from '../utils/date';
 import { TimePicker } from './TimePicker';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
+const MIN_DURATION = 5;
+const MAX_DURATION = 12 * 60;
 
 const WEEKDAY_LABELS: { day: Weekday; label: string }[] = [
   { day: 1, label: 'L' },
@@ -101,6 +104,13 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
     });
   };
 
+  const adjustDuration = (delta: number) => {
+    void Haptics.selectionAsync();
+    setDurationMinutes((prev) =>
+      Math.min(MAX_DURATION, Math.max(MIN_DURATION, prev + delta)),
+    );
+  };
+
   const toggleWeekday = (day: Weekday) => {
     void Haptics.selectionAsync();
     setRepeat((prev) => {
@@ -135,7 +145,12 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
       statusBarTranslucent
     >
       <View style={[styles.scrim, { backgroundColor: colors.scrim }]}>
-        <Pressable style={styles.scrimTap} onPress={onClose} accessibilityLabel="Cerrar" />
+        <Pressable
+          style={styles.scrimTap}
+          onPress={onClose}
+          accessibilityLabel="Cerrar"
+          accessibilityRole="button"
+        />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -167,6 +182,7 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
+              style={styles.scroll}
               contentContainerStyle={styles.form}
             >
               <View style={styles.field}>
@@ -205,7 +221,13 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
 
               {startMinutes !== null ? (
                 <View style={styles.field}>
-                  <Text style={[styles.label, { color: colors.foreground }]}>Duración</Text>
+                  <View style={styles.labelRow}>
+                    <Text style={[styles.label, { color: colors.foreground }]}>Duración</Text>
+                    <Text style={[styles.labelValue, { color: colors.primary }]}>
+                      {formatDuration(durationMinutes)}
+                    </Text>
+                  </View>
+
                   <View style={styles.chipRow}>
                     {DURATIONS.map((d) => {
                       const active = d === durationMinutes;
@@ -237,6 +259,39 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
                         </Pressable>
                       );
                     })}
+                  </View>
+
+                  {/* Fine adjustment, so any duration is reachable, not just the presets. */}
+                  <View style={[styles.stepper, { borderColor: colors.border }]}>
+                    <Pressable
+                      onPress={() => adjustDuration(-5)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Restar 5 minutos"
+                      accessibilityState={{ disabled: durationMinutes <= MIN_DURATION }}
+                      style={({ pressed }) => [
+                        styles.stepperBtn,
+                        { opacity: durationMinutes <= MIN_DURATION ? 0.35 : pressed ? 0.6 : 1 },
+                      ]}
+                    >
+                      <Ionicons name="remove" size={20} color={colors.foreground} />
+                    </Pressable>
+
+                    <Text style={[styles.stepperValue, { color: colors.foreground }]}>
+                      {durationMinutes} min
+                    </Text>
+
+                    <Pressable
+                      onPress={() => adjustDuration(5)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Sumar 5 minutos"
+                      accessibilityState={{ disabled: durationMinutes >= MAX_DURATION }}
+                      style={({ pressed }) => [
+                        styles.stepperBtn,
+                        { opacity: durationMinutes >= MAX_DURATION ? 0.35 : pressed ? 0.6 : 1 },
+                      ]}
+                    >
+                      <Ionicons name="add" size={20} color={colors.foreground} />
+                    </Pressable>
                   </View>
                 </View>
               ) : null}
@@ -418,14 +473,18 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
 const styles = StyleSheet.create({
   scrim: { flex: 1, justifyContent: 'flex-end' },
   scrimTap: { flex: 1 },
-  sheetWrap: { maxHeight: '92%' },
+  // flexShrink lets the sheet give way to the keyboard; the ScrollView inside
+  // then has a bounded height and can actually scroll.
+  sheetWrap: { flexShrink: 1 },
   sheet: {
+    flexShrink: 1,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     gap: spacing.md,
   },
+  scroll: { flexGrow: 0, flexShrink: 1 },
   grabber: {
     width: 38,
     height: 4,
@@ -444,6 +503,24 @@ const styles = StyleSheet.create({
   form: { gap: spacing.xl, paddingBottom: spacing.lg },
   field: { gap: spacing.sm },
   label: { fontFamily: fontFamily.semibold, fontSize: fontSize.footnote },
+  labelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  labelValue: { fontFamily: fontFamily.bold, fontSize: fontSize.footnote },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  stepperBtn: {
+    width: TOUCH_TARGET,
+    height: TOUCH_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValue: { fontFamily: fontFamily.semibold, fontSize: fontSize.body },
   helper: {
     fontFamily: fontFamily.regular,
     fontSize: fontSize.caption,
