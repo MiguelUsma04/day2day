@@ -43,8 +43,34 @@ const SW_SCRIPT = `
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js').catch(function () {
+          navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            // An installed PWA is usually resumed, not reloaded, so poll for a
+            // new build on launch and whenever it returns to the foreground.
+            var check = function () { reg.update().catch(function () {}); };
+            document.addEventListener('visibilitychange', function () {
+              if (document.visibilityState === 'visible') check();
+            });
+            setInterval(check, 60 * 60 * 1000);
+
+            reg.addEventListener('updatefound', function () {
+              var next = reg.installing;
+              if (!next) return;
+              next.addEventListener('statechange', function () {
+                // Only reload for a genuine replacement, never the first install.
+                if (next.state === 'installed' && navigator.serviceWorker.controller) {
+                  next.postMessage('SKIP_WAITING');
+                }
+              });
+            });
+          }).catch(function () {
             // Offline support is an enhancement; the app still runs without it.
+          });
+
+          var refreshed = false;
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (refreshed) return;
+            refreshed = true;
+            window.location.reload();
           });
         });
       }

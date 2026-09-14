@@ -4,9 +4,13 @@
  * Strategy: network-first for navigations (so a deploy is picked up promptly),
  * cache-first for hashed build assets (which never change under the same URL).
  * Task data itself lives in IndexedDB via AsyncStorage and is untouched here.
+ *
+ * An installed PWA is often resumed rather than navigated to, so a new deploy
+ * could otherwise sit unnoticed behind the cache. The page polls for an updated
+ * worker and this file never caches index.html's HTML for longer than a request.
  */
 
-const CACHE = 'day2day-v2';
+const CACHE = 'day2day-v3';
 const APP_SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -62,6 +66,10 @@ self.addEventListener('fetch', (event) => {
       });
     }),
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // Focus the app when a reminder is tapped, rather than opening a second window.
