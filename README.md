@@ -12,7 +12,7 @@ Hecha con Expo (React Native) y desplegable como PWA instalable en el iPhone.
 - **Lista de pendientes** aparte del cronograma, para lo que no tiene hora fija.
 - **Recordatorios** en el celular, con aviso configurable por actividad.
 - **Iconos** por actividad, elegidos de un catálogo.
-- **Importar / exportar** el cronograma completo como JSON.
+- **Importar / exportar** el cronograma completo como JSON, y **respaldo** que además incluye los pendientes y el historial de rachas.
 - **Reporte de constancia**: porcentaje cumplido, rachas, días perfectos, calendario de los últimos días y qué hábitos se te dan mejor o peor.
 - **Seis temas de color** (azul, rosa, lila, ámbar, verde, coral) que tiñen toda la interfaz —fondo, tarjetas y bordes incluidos—, más modo claro/oscuro/automático.
 - **Progreso diario** y marcador **"Ahora"** sobre la actividad en curso.

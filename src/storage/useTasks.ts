@@ -187,6 +187,12 @@ export function useTasks() {
     setTodos((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  /** Replaces everything from a backup, history included. */
+  const restoreBackup = useCallback((nextTasks: Task[], nextTodos: Todo[]) => {
+    setTasks(nextTasks);
+    setTodos(nextTodos);
+  }, []);
+
   const getTodosForDay = useCallback(
     (dayKey: string) =>
       todos.filter((t) => t.date === dayKey).sort((a, b) => a.createdAt - b.createdAt),
@@ -203,6 +209,7 @@ export function useTasks() {
     deleteTask,
     skipOccurrence,
     importTasks,
+    restoreBackup,
     getTasksForDay,
     markedDays,
     addTodo,

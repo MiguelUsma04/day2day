@@ -13,11 +13,17 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { buildExport, buildSample, parseImport } from '../storage/importExport';
+import {
+  buildBackup,
+  buildExport,
+  buildSample,
+  parseBackup,
+  parseImport,
+} from '../storage/importExport';
 import { shadow } from '../theme/shadows';
 import { MODES, useTheme, type ModePreference } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
-import type { Task, TaskDraft } from '../types/task';
+import type { Task, TaskDraft, Todo } from '../types/task';
 import { toDayKey } from '../utils/date';
 import {
   getPermission,
@@ -36,7 +42,9 @@ const MODE_LABELS: Record<ModePreference, string> = {
 
 type Props = {
   tasks: Task[];
+  todos: Todo[];
   onImport: (tasks: TaskDraft[], replace: boolean) => number;
+  onRestore: (tasks: Task[], todos: Todo[]) => void;
 };
 
 /** Triggers a file download in the browser; a no-op elsewhere. */
@@ -69,7 +77,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export function SettingsScreen({ tasks, onImport }: Props) {
+export function SettingsScreen({ tasks, todos, onImport, onRestore }: Props) {
   const { colors, isDark, themeId, mode, options, setThemeId, setMode } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -131,6 +139,44 @@ export function SettingsScreen({ tasks, onImport }: Props) {
       setFeedback({ tone: 'ok', message: 'Ejemplo cargado abajo para que lo veas.' });
     }
   }, []);
+
+  const handleBackup = useCallback(async () => {
+    void Haptics.selectionAsync();
+    if (tasks.length === 0 && todos.length === 0) {
+      setFeedback({ tone: 'error', message: 'Todavía no hay nada que respaldar.' });
+      return;
+    }
+    const content = buildBackup(tasks, todos);
+    const stamp = toDayKey(new Date());
+    if (downloadJson(`day2day-respaldo-${stamp}.json`, content)) {
+      setFeedback({ tone: 'ok', message: 'Respaldo descargado. Guárdalo en Archivos o envíatelo.' });
+      return;
+    }
+    if (await copyToClipboard(content)) {
+      setFeedback({
+        tone: 'ok',
+        message: 'Respaldo copiado. Pégalo en Notas o envíatelo para tenerlo a salvo.',
+      });
+    } else {
+      setFeedback({ tone: 'error', message: 'No se pudo generar el respaldo en este navegador.' });
+    }
+  }, [tasks, todos]);
+
+  const handleRestore = useCallback(() => {
+    const result = parseBackup(importText);
+    if (!result.ok) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setFeedback({ tone: 'error', message: result.error });
+      return;
+    }
+    onRestore(result.tasks, result.todos);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setImportText('');
+    setFeedback({
+      tone: 'ok',
+      message: `Restaurado: ${result.tasks.length} actividades y ${result.todos.length} pendientes, con tu historial.`,
+    });
+  }, [importText, onRestore]);
 
   const handleExport = useCallback(async () => {
     void Haptics.selectionAsync();
@@ -325,6 +371,33 @@ export function SettingsScreen({ tasks, onImport }: Props) {
         )}
       </View>
 
+      {/* ---- Backup ---- */}
+      <View style={card}>
+        <Text style={[styles.cardTitle, { color: colors.foreground }]}>Respaldo</Text>
+        <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
+          Tus datos viven solo en este dispositivo. Guarda un respaldo de vez en cuando: incluye
+          el cronograma, los pendientes y tu historial de rachas.
+        </Text>
+
+        <Pressable
+          onPress={handleBackup}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.primaryBtn,
+            { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Ionicons name="save-outline" size={17} color={colors.onPrimary} />
+          <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
+            Guardar respaldo
+          </Text>
+        </Pressable>
+
+        <Text style={[styles.cardHint, { color: colors.mutedForeground, marginTop: spacing.xs }]}>
+          Para recuperarlo, pega el contenido del respaldo abajo y toca Restaurar.
+        </Text>
+      </View>
+
       {/* ---- Import / export ---- */}
       <View style={card}>
         <Text style={[styles.cardTitle, { color: colors.foreground }]}>Importar cronograma</Text>
@@ -409,6 +482,24 @@ export function SettingsScreen({ tasks, onImport }: Props) {
         >
           <Ionicons name="cloud-upload-outline" size={17} color={colors.onPrimary} />
           <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>Importar</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleRestore}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: importText.trim().length === 0 }}
+          style={({ pressed }) => [
+            styles.secondaryBtn,
+            {
+              borderColor: colors.border,
+              opacity: importText.trim().length === 0 ? 0.4 : pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Ionicons name="refresh-outline" size={16} color={colors.foreground} />
+          <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+            Restaurar respaldo
+          </Text>
         </Pressable>
 
         {feedback ? (

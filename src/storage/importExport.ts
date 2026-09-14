@@ -6,6 +6,7 @@ import {
   type RepeatKind,
   type Task,
   type TaskDraft,
+  type Todo,
   type Weekday,
 } from '../types/task';
 import { toDayKey } from '../utils/date';
@@ -203,7 +204,56 @@ export function parseImport(raw: string, defaultDate: string): ImportResult {
   return { ok: true, tasks, warnings };
 }
 
-/** Serialises the current schedule back to the import format. */
+/**
+ * Full backup: the schedule plus the to-do list and the completion history.
+ *
+ * The plain import format describes activities only. A backup must also carry
+ * `completedDays` and `skippedDays`, or restoring it would silently wipe the
+ * streaks and the progress report.
+ */
+export function buildBackup(tasks: Task[], todos: Todo[]): string {
+  return JSON.stringify(
+    {
+      version: 2,
+      kind: 'backup',
+      exportedAt: new Date().toISOString(),
+      tasks,
+      todos,
+    },
+    null,
+    2,
+  );
+}
+
+export type BackupResult =
+  | { ok: true; tasks: Task[]; todos: Todo[] }
+  | { ok: false; error: string };
+
+/** Reads a file produced by buildBackup, restoring history as well as content. */
+export function parseBackup(raw: string): BackupResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'El texto no es un JSON válido.' };
+  }
+
+  if (typeof parsed !== 'object' || parsed === null) {
+    return { ok: false, error: 'El respaldo no tiene el formato esperado.' };
+  }
+  const p = parsed as { kind?: unknown; tasks?: unknown; todos?: unknown };
+  if (p.kind !== 'backup' || !Array.isArray(p.tasks)) {
+    return { ok: false, error: 'Esto no parece un respaldo de day2day.' };
+  }
+
+  return {
+    ok: true,
+    tasks: p.tasks as Task[],
+    todos: Array.isArray(p.todos) ? (p.todos as Todo[]) : [],
+  };
+}
+
+/** Serialises the schedule in the shareable import format (no history). */
 export function buildExport(tasks: Task[]): string {
   const toTime = (m: number | null) =>
     m === null ? null : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;

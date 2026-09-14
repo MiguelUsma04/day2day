@@ -65,7 +65,12 @@ export function RootScreen() {
         {tab === 'report' ? <ReportScreen tasks={store.tasks} todos={store.todos} /> : null}
 
         {tab === 'settings' ? (
-          <SettingsScreen tasks={store.tasks} onImport={store.importTasks} />
+          <SettingsScreen
+            tasks={store.tasks}
+            todos={store.todos}
+            onImport={store.importTasks}
+            onRestore={store.restoreBackup}
+          />
         ) : null}
       </View>
 
