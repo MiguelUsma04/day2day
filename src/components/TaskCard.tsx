@@ -1,5 +1,5 @@
-import React, { useCallback, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -36,6 +36,13 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
   const committed = useRef(false);
   /** Set while a swipe is in flight, to suppress the tap it also produces. */
   const swiping = useRef(false);
+  const [pressed, setPressed] = useState(false);
+  /** Where the current pointer went down, for measuring drag distance. */
+  const downPoint = useRef<{ x: number; y: number } | null>(null);
+  /** True from touch-down until the gesture settles, whatever it turns into. */
+  const gestureActive = useRef(false);
+  /** Set once the pointer travels far enough to count as a drag. */
+  const moved = useRef(false);
 
   const springBack = useCallback(() => {
     Animated.spring(translateX, {
@@ -66,8 +73,15 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
     .failOffsetY([-14, 14])
     .onBegin(() => {
       committed.current = false;
+      gestureActive.current = true;
+      moved.current = false;
     })
     .onUpdate((event) => {
+      // Any real movement means this is a scroll or a swipe, not a tap.
+      if (Math.abs(event.translationX) > 4 || Math.abs(event.translationY) > 4) {
+        moved.current = true;
+        setPressed(false);
+      }
       if (Math.abs(event.translationX) > 4) swiping.current = true;
       translateX.setValue(event.translationX);
       // Fire the haptic once, as the threshold is crossed, not on every frame.
@@ -86,6 +100,9 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
     })
     .onFinalize(() => {
       springBack();
+      setPressed(false);
+      gestureActive.current = false;
+      moved.current = false;
       // Clear after the click event that follows pointer-up has been dispatched.
       setTimeout(() => {
         swiping.current = false;
@@ -94,9 +111,64 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
     .runOnJS(true);
 
   const handlePress = useCallback(() => {
+    setPressed(false);
     if (swiping.current) return;
     onPress(task);
   }, [task, onPress]);
+
+  /**
+   * Keeps the pressed look honest on web.
+   *
+   * RN-web's Pressable applies its pressed style after a short delay and only
+   * clears it on its own release event. When the finger scrolls the list, that
+   * release never arrives at the card, leaving it dimmed indefinitely. Watching
+   * the document for movement and release fixes both halves of that.
+   */
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+
+    const onMove = (event: PointerEvent | TouchEvent) => {
+      const point =
+        'touches' in event ? event.touches[0] : (event as PointerEvent);
+      if (!point) return;
+      if (downPoint.current === null) return;
+      const dx = point.clientX - downPoint.current.x;
+      const dy = point.clientY - downPoint.current.y;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+        moved.current = true;
+        setPressed(false);
+      }
+    };
+
+    const onDown = (event: PointerEvent | TouchEvent) => {
+      const point = 'touches' in event ? event.touches[0] : (event as PointerEvent);
+      if (!point) return;
+      downPoint.current = { x: point.clientX, y: point.clientY };
+      moved.current = false;
+    };
+
+    const onUp = () => {
+      downPoint.current = null;
+      setPressed(false);
+    };
+
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('pointermove', onMove, true);
+    document.addEventListener('pointerup', onUp, true);
+    document.addEventListener('pointercancel', onUp, true);
+    document.addEventListener('touchmove', onMove, true);
+    document.addEventListener('touchend', onUp, true);
+    document.addEventListener('touchcancel', onUp, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('pointermove', onMove, true);
+      document.removeEventListener('pointerup', onUp, true);
+      document.removeEventListener('pointercancel', onUp, true);
+      document.removeEventListener('touchmove', onMove, true);
+      document.removeEventListener('touchend', onUp, true);
+      document.removeEventListener('touchcancel', onUp, true);
+    };
+  }, []);
 
   // Action backgrounds reveal progressively, so the gesture explains itself.
   const completeOpacity = translateX.interpolate({
@@ -146,7 +218,13 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
             accessibilityRole="button"
             accessibilityLabel={`${task.title}${task.done ? ', completada' : ''}`}
             accessibilityHint="Toca para editar. Desliza a la derecha para completar, a la izquierda para eliminar."
-            style={({ pressed }) => [
+            onPressIn={() => {
+              // Ignore the delayed press-in that arrives after a drag began.
+              if (moved.current) return;
+              setPressed(true);
+            }}
+            onPressOut={() => setPressed(false)}
+            style={[
               styles.card,
               shadow('sm', isDark),
               {
