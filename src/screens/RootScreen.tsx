@@ -1,0 +1,78 @@
+import React, { useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+import { TabBar, type TabId } from '../components/TabBar';
+import { useTasks } from '../storage/useTasks';
+import { useTheme } from '../theme/ThemeProvider';
+import { toDayKey } from '../utils/date';
+import { ScheduleScreen } from './ScheduleScreen';
+import { SettingsScreen } from './SettingsScreen';
+import { TodosScreen } from './TodosScreen';
+
+/**
+ * Owns the shared state (selected day, tasks, todos) so switching tabs keeps
+ * the same day in view rather than resetting to today.
+ */
+export function RootScreen() {
+  const { colors } = useTheme();
+  const store = useTasks();
+  const [tab, setTab] = useState<TabId>('schedule');
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+
+  const dayKey = toDayKey(selectedDate);
+  const tasks = store.getTasksForDay(dayKey);
+  const todos = store.getTodosForDay(dayKey);
+  const pendingCount = todos.filter((t) => !t.done).length;
+
+  if (store.isLoading) {
+    return (
+      <View style={[styles.loading, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View style={styles.body}>
+        {tab === 'schedule' ? (
+          <ScheduleScreen
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            markedDays={store.markedDays}
+            tasks={tasks}
+            onToggle={store.toggleTask}
+            onAdd={store.addTask}
+            onUpdate={store.updateTask}
+            onDelete={store.deleteTask}
+            onSkip={store.skipOccurrence}
+          />
+        ) : null}
+
+        {tab === 'todos' ? (
+          <TodosScreen
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            markedDays={store.markedDays}
+            todos={todos}
+            onAdd={store.addTodo}
+            onToggle={store.toggleTodo}
+            onDelete={store.deleteTodo}
+          />
+        ) : null}
+
+        {tab === 'settings' ? (
+          <SettingsScreen tasks={store.tasks} onImport={store.importTasks} />
+        ) : null}
+      </View>
+
+      <TabBar current={tab} onChange={setTab} pendingCount={pendingCount} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  body: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+});

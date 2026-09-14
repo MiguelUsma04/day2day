@@ -42,10 +42,12 @@ export type ThemeColors = {
   mutedForeground: string;
   border: string;
   destructive: string;
+  ring: string;
   scrim: string;
 };
 
 export const lightColors: ThemeColors = {
+  ring: palette.blue600,
   primary: palette.blue600,
   onPrimary: palette.white,
   accent: palette.green600,
@@ -61,6 +63,7 @@ export const lightColors: ThemeColors = {
 };
 
 export const darkColors: ThemeColors = {
+  ring: palette.blue500,
   primary: palette.blue500,
   onPrimary: palette.white,
   accent: '#34D399',

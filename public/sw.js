@@ -6,7 +6,7 @@
  * Task data itself lives in IndexedDB via AsyncStorage and is untouched here.
  */
 
-const CACHE = 'day2day-v1';
+const CACHE = 'day2day-v2';
 const APP_SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -60,6 +60,19 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       });
+    }),
+  );
+});
+
+// Focus the app when a reminder is tapped, rather than opening a second window.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client) return client.focus();
+      }
+      return self.clients.openWindow('/');
     }),
   );
 });

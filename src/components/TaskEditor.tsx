@@ -27,12 +27,25 @@ import {
   type TaskInstance,
   type Weekday,
 } from '../types/task';
+import { categoryMeta as catMeta } from '../theme/categories';
+import type { IconName } from '../theme/icons';
 import { formatDuration } from '../utils/date';
+import { IconPicker } from './IconPicker';
 import { TimePicker } from './TimePicker';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 const MIN_DURATION = 5;
 const MAX_DURATION = 12 * 60;
+
+/** Minutes before the start time; null means no reminder. */
+const REMINDERS: { value: number | null; label: string }[] = [
+  { value: null, label: 'Sin aviso' },
+  { value: 0, label: 'A la hora' },
+  { value: 5, label: '5 min antes' },
+  { value: 10, label: '10 min antes' },
+  { value: 30, label: '30 min antes' },
+  { value: 60, label: '1 h antes' },
+];
 
 const WEEKDAY_LABELS: { day: Weekday; label: string }[] = [
   { day: 1, label: 'L' },
@@ -71,6 +84,8 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [category, setCategory] = useState<Category>('personal');
   const [repeat, setRepeat] = useState<Repeat>(NO_REPEAT);
+  const [icon, setIcon] = useState<IconName | undefined>(undefined);
+  const [reminderMinutes, setReminderMinutes] = useState<number | null>(null);
   const [touched, setTouched] = useState(false);
 
   // Reset the form each time the sheet opens, so a stale draft never leaks in.
@@ -82,6 +97,8 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
     setDurationMinutes(task?.durationMinutes ?? 30);
     setCategory(task?.category ?? 'personal');
     setRepeat(task?.repeat ?? NO_REPEAT);
+    setIcon((task?.icon as IconName | undefined) ?? undefined);
+    setReminderMinutes(task?.reminderMinutes ?? null);
     setTouched(false);
   }, [visible, task]);
 
@@ -100,7 +117,9 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
       startMinutes,
       durationMinutes,
       category,
+      icon,
       repeat,
+      reminderMinutes: startMinutes === null ? null : reminderMinutes,
     });
   };
 
@@ -337,6 +356,56 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
                   })}
                 </View>
               </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.foreground }]}>Icono</Text>
+                <IconPicker
+                  value={icon}
+                  fallback={catMeta[category].icon as IconName}
+                  onChange={setIcon}
+                />
+              </View>
+
+              {startMinutes !== null ? (
+                <View style={styles.field}>
+                  <Text style={[styles.label, { color: colors.foreground }]}>Recordatorio</Text>
+                  <Text style={[styles.helper, { color: colors.mutedForeground }]}>
+                    Te avisa en el celular. Requiere instalar la app en la pantalla de inicio.
+                  </Text>
+                  <View style={styles.chipRow}>
+                    {REMINDERS.map((opt) => {
+                      const active = opt.value === reminderMinutes;
+                      return (
+                        <Pressable
+                          key={String(opt.value)}
+                          onPress={() => {
+                            void Haptics.selectionAsync();
+                            setReminderMinutes(opt.value);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                          style={[
+                            styles.chip,
+                            {
+                              backgroundColor: active ? colors.primary : colors.muted,
+                              borderColor: active ? colors.primary : colors.border,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              { color: active ? colors.onPrimary : colors.foreground },
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
 
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.foreground }]}>Repetir</Text>

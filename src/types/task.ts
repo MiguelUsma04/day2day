@@ -15,9 +15,15 @@ export type Repeat = {
 
 export const NO_REPEAT: Repeat = { kind: 'none', days: [] };
 
+/** Fields a single day can override on a repeating task. */
+export type Override = Partial<
+  Pick<Task, 'title' | 'notes' | 'startMinutes' | 'durationMinutes' | 'category' | 'icon'>
+>;
+
 /**
  * A single entry in the schedule. A repeating entry is stored once and projected
  * onto every matching day, so editing the routine updates every day at once.
+ * A single day can deviate via `overrides`, keyed by day.
  */
 export type Task = {
   id: string;
@@ -28,6 +34,8 @@ export type Task = {
   startMinutes: number | null;
   durationMinutes: number;
   category: Category;
+  /** Ionicons name; falls back to the category icon when absent. */
+  icon?: string;
   repeat: Repeat;
   /**
    * Completion is per-day, keyed by "YYYY-MM-DD", so finishing a routine today
@@ -36,14 +44,36 @@ export type Task = {
   completedDays: string[];
   /** Days on which a repeating task was dismissed without deleting the routine. */
   skippedDays: string[];
+  /** Per-day edits that apply to one occurrence only. */
+  overrides: Record<string, Override>;
+  /** Minutes before the start time to fire a reminder; null disables it. */
+  reminderMinutes: number | null;
   createdAt: number;
 };
 
-export type TaskDraft = Omit<Task, 'id' | 'createdAt' | 'completedDays' | 'skippedDays'>;
+export type TaskDraft = Omit<
+  Task,
+  'id' | 'createdAt' | 'completedDays' | 'skippedDays' | 'overrides'
+>;
 
 /** A task resolved onto one specific day, ready to render. */
 export type TaskInstance = Task & {
   dayKey: string;
   done: boolean;
   isRepeating: boolean;
+  /** True when this day carries its own edits. */
+  hasOverride: boolean;
+};
+
+/** How an edit to a repeating task should apply. */
+export type EditScope = 'one' | 'all';
+
+/** A lightweight item on the day's to-do list, outside the timed schedule. */
+export type Todo = {
+  id: string;
+  title: string;
+  /** Local "YYYY-MM-DD" the item belongs to. */
+  date: string;
+  done: boolean;
+  createdAt: number;
 };

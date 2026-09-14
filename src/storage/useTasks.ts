@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Task, TaskDraft, TaskInstance, Weekday } from '../types/task';
+import type {
+  EditScope,
+  Task,
+  TaskDraft,
+  TaskInstance,
+  Todo,
+  Weekday,
+} from '../types/task';
 import { fromDayKey } from '../utils/date';
-import { loadTasks, saveTasks } from './tasks';
+import { loadTasks, loadTodos, saveTasks, saveTodos } from './tasks';
 
 function createId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -38,16 +45,31 @@ function occursOn(task: Task, dayKey: string): boolean {
   }
 }
 
+/** Applies any per-day override on top of the stored task. */
+function resolve(task: Task, dayKey: string): TaskInstance {
+  const override = task.overrides[dayKey];
+  return {
+    ...task,
+    ...(override ?? {}),
+    dayKey,
+    done: task.completedDays.includes(dayKey),
+    isRepeating: task.repeat.kind !== 'none',
+    hasOverride: override !== undefined,
+  };
+}
+
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const hydrated = useRef(false);
 
   useEffect(() => {
     let active = true;
-    loadTasks().then((stored) => {
+    Promise.all([loadTasks(), loadTodos()]).then(([storedTasks, storedTodos]) => {
       if (!active) return;
-      setTasks(stored);
+      setTasks(storedTasks);
+      setTodos(storedTodos);
       setIsLoading(false);
       hydrated.current = true;
     });
@@ -62,16 +84,56 @@ export function useTasks() {
     void saveTasks(tasks);
   }, [tasks]);
 
+  useEffect(() => {
+    if (!hydrated.current) return;
+    void saveTodos(todos);
+  }, [todos]);
+
   const addTask = useCallback((draft: TaskDraft) => {
     setTasks((prev) => [
       ...prev,
-      { ...draft, id: createId(), completedDays: [], skippedDays: [], createdAt: Date.now() },
+      {
+        ...draft,
+        id: createId(),
+        completedDays: [],
+        skippedDays: [],
+        overrides: {},
+        createdAt: Date.now(),
+      },
     ]);
   }, []);
 
-  const updateTask = useCallback((id: string, patch: Partial<TaskDraft>) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
-  }, []);
+  /**
+   * Scope 'all' rewrites the task itself; scope 'one' records a per-day override,
+   * leaving the other occurrences of a routine untouched.
+   */
+  const updateTask = useCallback(
+    (id: string, patch: Partial<TaskDraft>, scope: EditScope, dayKey: string) => {
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id !== id) return t;
+
+          if (scope === 'all' || t.repeat.kind === 'none') {
+            // Editing the whole series makes stale per-day copies misleading.
+            const { repeat: _r, ...rest } = patch;
+            const clearedOverrides =
+              Object.keys(rest).length > 0 ? {} : t.overrides;
+            return { ...t, ...patch, overrides: clearedOverrides };
+          }
+
+          const { repeat: _ignored, reminderMinutes: _r2, ...dayFields } = patch;
+          return {
+            ...t,
+            overrides: {
+              ...t.overrides,
+              [dayKey]: { ...(t.overrides[dayKey] ?? {}), ...dayFields },
+            },
+          };
+        }),
+      );
+    },
+    [],
+  );
 
   /** Toggling affects only the given day, keeping routine history per-day. */
   const toggleTask = useCallback((id: string, dayKey: string) => {
@@ -104,18 +166,25 @@ export function useTasks() {
     );
   }, []);
 
+  /** Replaces or appends imported entries; returns how many were added. */
+  const importTasks = useCallback((incoming: TaskDraft[], replace: boolean) => {
+    const now = Date.now();
+    const built: Task[] = incoming.map((draft, i) => ({
+      ...draft,
+      id: createId(),
+      completedDays: [],
+      skippedDays: [],
+      overrides: {},
+      // Stagger so same-time entries keep their listed order.
+      createdAt: now + i,
+    }));
+    setTasks((prev) => (replace ? built : [...prev, ...built]));
+    return built.length;
+  }, []);
+
   const getTasksForDay = useCallback(
-    (dayKey: string): TaskInstance[] => {
-      const instances = tasks
-        .filter((task) => occursOn(task, dayKey))
-        .map<TaskInstance>((task) => ({
-          ...task,
-          dayKey,
-          done: task.completedDays.includes(dayKey),
-          isRepeating: task.repeat.kind !== 'none',
-        }));
-      return sortInstances(instances);
-    },
+    (dayKey: string): TaskInstance[] =>
+      sortInstances(tasks.filter((t) => occursOn(t, dayKey)).map((t) => resolve(t, dayKey))),
     [tasks],
   );
 
@@ -125,21 +194,46 @@ export function useTasks() {
     for (const task of tasks) {
       if (task.repeat.kind === 'none') keys.add(task.date);
     }
+    for (const todo of todos) keys.add(todo.date);
     return keys;
-  }, [tasks]);
+  }, [tasks, todos]);
 
-  const hasRoutines = useMemo(() => tasks.some((t) => t.repeat.kind !== 'none'), [tasks]);
+  const addTodo = useCallback((title: string, date: string) => {
+    setTodos((prev) => [
+      ...prev,
+      { id: createId(), title, date, done: false, createdAt: Date.now() },
+    ]);
+  }, []);
+
+  const toggleTodo = useCallback((id: string) => {
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  }, []);
+
+  const deleteTodo = useCallback((id: string) => {
+    setTodos((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const getTodosForDay = useCallback(
+    (dayKey: string) =>
+      todos.filter((t) => t.date === dayKey).sort((a, b) => a.createdAt - b.createdAt),
+    [todos],
+  );
 
   return {
     tasks,
+    todos,
     isLoading,
     addTask,
     updateTask,
     toggleTask,
     deleteTask,
     skipOccurrence,
+    importTasks,
     getTasksForDay,
     markedDays,
-    hasRoutines,
+    addTodo,
+    toggleTodo,
+    deleteTodo,
+    getTodosForDay,
   };
 }
