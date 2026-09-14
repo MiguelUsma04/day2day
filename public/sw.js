@@ -10,7 +10,7 @@
  * worker and this file never caches index.html's HTML for longer than a request.
  */
 
-const CACHE = 'day2day-v3';
+const CACHE = 'day2day-v4';
 const APP_SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -49,6 +49,23 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => caches.match('/index.html').then((cached) => cached ?? Response.error())),
+    );
+    return;
+  }
+
+  // Icons and the manifest keep stable URLs, so they must be revalidated or a
+  // redesign never reaches an installed app. Cache only as an offline fallback.
+  if (url.pathname.startsWith('/icons/') || url.pathname === '/manifest.json') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached ?? Response.error())),
     );
     return;
   }

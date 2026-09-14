@@ -32,7 +32,10 @@ const HEAD_TAGS = `
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="day2day" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-167.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/icons/icon-120.png" />
     <meta name="color-scheme" content="light dark" />
     <meta
       name="viewport"
