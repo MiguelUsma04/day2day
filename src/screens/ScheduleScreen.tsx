@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { ProgressRing } from '../components/ProgressRing';
 import { ScopeDialog } from '../components/ScopeDialog';
@@ -16,6 +17,7 @@ import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/to
 import type { EditScope, TaskDraft, TaskInstance } from '../types/task';
 import { friendlyDate, isToday, minutesSinceMidnight, toDayKey } from '../utils/date';
 import { scheduleReminders } from '../utils/notifications';
+import { playDelete } from '../utils/sound';
 
 type Props = {
   selectedDate: Date;
@@ -51,6 +53,7 @@ export function ScheduleScreen({
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<TaskInstance | null>(null);
   const [pending, setPending] = useState<PendingScope | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<TaskInstance | null>(null);
   const [nowMinutes, setNowMinutes] = useState(() => minutesSinceMidnight(new Date()));
 
   // Keep the "Ahora" marker fresh without re-rendering every second.
@@ -113,17 +116,23 @@ export function ScheduleScreen({
     [editing, onAdd, onUpdate, dayKey, closeEditor],
   );
 
-  const handleDeleteRequest = useCallback(
-    (task: TaskInstance) => {
-      if (task.isRepeating) {
-        setPending({ intent: 'delete', task });
-        return;
-      }
-      onDelete(task.id);
-      if (editing?.id === task.id) closeEditor();
-    },
-    [onDelete, editing, closeEditor],
-  );
+  const handleDeleteRequest = useCallback((task: TaskInstance) => {
+    // Repeating tasks need the scope question; single ones just need a yes/no.
+    if (task.isRepeating) {
+      setPending({ intent: 'delete', task });
+      return;
+    }
+    setConfirmDelete(task);
+  }, []);
+
+  const confirmSingleDelete = useCallback(() => {
+    if (!confirmDelete) return;
+    onDelete(confirmDelete.id);
+    playDelete();
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (editing?.id === confirmDelete.id) closeEditor();
+    setConfirmDelete(null);
+  }, [confirmDelete, onDelete, editing, closeEditor]);
 
   const resolveScope = useCallback(
     (scope: EditScope) => {
@@ -132,8 +141,10 @@ export function ScheduleScreen({
         onUpdate(pending.task.id, pending.draft, scope, pending.task.dayKey);
       } else if (scope === 'all') {
         onDelete(pending.task.id);
+        playDelete();
       } else {
         onSkip(pending.task.id, pending.task.dayKey);
+        playDelete();
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setPending(null);
@@ -244,6 +255,20 @@ export function ScheduleScreen({
           const target = editing?.id === id ? editing : null;
           if (target) handleDeleteRequest(target);
         }}
+      />
+
+      <ConfirmDialog
+        visible={confirmDelete !== null}
+        title="¿Eliminar actividad?"
+        message={
+          confirmDelete
+            ? `"${confirmDelete.title}" se quitará de tu cronograma. Esta acción no se puede deshacer.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+        destructive
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={confirmSingleDelete}
       />
 
       <ScopeDialog

@@ -11,7 +11,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing } from '../theme/tokens';
 import type { TaskInstance } from '../types/task';
 import { formatDuration, formatTime } from '../utils/date';
-import { playComplete, playDelete, playUndo } from '../utils/sound';
+import { playComplete, playUndo } from '../utils/sound';
 
 /** Horizontal travel before an action commits. */
 const THRESHOLD = 78;
@@ -34,6 +34,8 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
 
   const translateX = useRef(new Animated.Value(0)).current;
   const committed = useRef(false);
+  /** Set while a swipe is in flight, to suppress the tap it also produces. */
+  const swiping = useRef(false);
 
   const springBack = useCallback(() => {
     Animated.spring(translateX, {
@@ -54,7 +56,6 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
   }, [task, onToggle]);
 
   const remove = useCallback(() => {
-    playDelete();
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onDelete(task);
   }, [task, onDelete]);
@@ -67,6 +68,7 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
       committed.current = false;
     })
     .onUpdate((event) => {
+      if (Math.abs(event.translationX) > 4) swiping.current = true;
       translateX.setValue(event.translationX);
       // Fire the haptic once, as the threshold is crossed, not on every frame.
       if (!committed.current && Math.abs(event.translationX) >= THRESHOLD) {
@@ -84,8 +86,17 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
     })
     .onFinalize(() => {
       springBack();
+      // Clear after the click event that follows pointer-up has been dispatched.
+      setTimeout(() => {
+        swiping.current = false;
+      }, 120);
     })
     .runOnJS(true);
+
+  const handlePress = useCallback(() => {
+    if (swiping.current) return;
+    onPress(task);
+  }, [task, onPress]);
 
   // Action backgrounds reveal progressively, so the gesture explains itself.
   const completeOpacity = translateX.interpolate({
@@ -101,7 +112,12 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
 
   return (
     <View style={styles.container}>
-      <View style={styles.actions} pointerEvents="none">
+      <View
+        style={styles.actions}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         <Animated.View
           style={[styles.action, styles.actionLeft, { backgroundColor: colors.accent, opacity: completeOpacity }]}
         >
@@ -126,7 +142,7 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
       <GestureDetector gesture={pan}>
         <Animated.View style={{ transform: [{ translateX }] }}>
           <Pressable
-            onPress={() => onPress(task)}
+            onPress={handlePress}
             accessibilityRole="button"
             accessibilityLabel={`${task.title}${task.done ? ', completada' : ''}`}
             accessibilityHint="Toca para editar. Desliza a la derecha para completar, a la izquierda para eliminar."

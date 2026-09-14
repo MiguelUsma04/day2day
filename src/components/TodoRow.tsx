@@ -7,7 +7,7 @@ import { shadow } from '../theme/shadows';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import type { Todo } from '../types/task';
-import { playComplete, playDelete, playUndo } from '../utils/sound';
+import { playComplete, playUndo } from '../utils/sound';
 
 type Props = {
   todo: Todo;
@@ -27,8 +27,7 @@ export function TodoRow({ todo, onToggle, onDelete }: Props) {
     onToggle(todo.id);
   }, [todo, onToggle]);
 
-  const remove = useCallback(() => {
-    playDelete();
+  const requestRemove = useCallback(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onDelete(todo.id);
   }, [todo.id, onDelete]);
@@ -75,7 +74,7 @@ export function TodoRow({ todo, onToggle, onDelete }: Props) {
       </Pressable>
 
       <Pressable
-        onPress={remove}
+        onPress={requestRemove}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={`Eliminar ${todo.title}`}

@@ -8,7 +8,7 @@ Hecha con Expo (React Native) y desplegable como PWA instalable en el iPhone.
 
 - **Cronograma por día** con línea de tiempo, hora exacta al minuto y duración.
 - **Rutinas que se repiten**: cada día, de lunes a viernes, o días específicos. Se definen una vez y aparecen solas en cada día que corresponda. Al editarlas se pregunta si el cambio va a ese día o a toda la serie.
-- **Deslizar para actuar**: a la derecha completa (con sonido), a la izquierda elimina.
+- **Deslizar para actuar**: a la derecha completa (con sonido), a la izquierda elimina pidiendo confirmación.
 - **Lista de pendientes** aparte del cronograma, para lo que no tiene hora fija.
 - **Recordatorios** en el celular, con aviso configurable por actividad.
 - **Iconos** por actividad, elegidos de un catálogo.

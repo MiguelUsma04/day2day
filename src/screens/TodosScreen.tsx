@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { ProgressRing } from '../components/ProgressRing';
 import { TodoRow } from '../components/TodoRow';
@@ -22,6 +23,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import type { Todo } from '../types/task';
 import { friendlyDate, toDayKey } from '../utils/date';
+import { playDelete } from '../utils/sound';
 
 type Props = {
   selectedDate: Date;
@@ -45,6 +47,7 @@ export function TodosScreen({
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null);
 
   const dayKey = toDayKey(selectedDate);
   const doneCount = todos.filter((t) => t.done).length;
@@ -56,6 +59,13 @@ export function TodosScreen({
     onAdd(value, dayKey);
     setDraft('');
   }, [draft, dayKey, onAdd]);
+
+  const confirmRemoval = useCallback(() => {
+    if (!confirmDelete) return;
+    onDelete(confirmDelete.id);
+    playDelete();
+    setConfirmDelete(null);
+  }, [confirmDelete, onDelete]);
 
   return (
     <View style={styles.root}>
@@ -85,7 +95,7 @@ export function TodosScreen({
         data={todos}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TodoRow todo={item} onToggle={onToggle} onDelete={onDelete} />
+          <TodoRow todo={item} onToggle={onToggle} onDelete={() => setConfirmDelete(item)} />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: spacing.xl }]}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
@@ -97,6 +107,20 @@ export function TodosScreen({
         }
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+      />
+
+      <ConfirmDialog
+        visible={confirmDelete !== null}
+        title="¿Eliminar pendiente?"
+        message={
+          confirmDelete
+            ? `"${confirmDelete.title}" se borrará de tu lista.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+        destructive
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={confirmRemoval}
       />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
