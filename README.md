@@ -13,7 +13,8 @@ Hecha con Expo (React Native) y desplegable como PWA instalable en el iPhone.
 - **Recordatorios** en el celular, con aviso configurable por actividad.
 - **Iconos** por actividad, elegidos de un catálogo.
 - **Importar / exportar** el cronograma completo como JSON.
-- **Seis temas de color** (azul, rosa, lila, ámbar, verde, coral) y modo claro/oscuro/automático.
+- **Reporte de constancia**: porcentaje cumplido, rachas, días perfectos, calendario de los últimos días y qué hábitos se te dan mejor o peor.
+- **Seis temas de color** (azul, rosa, lila, ámbar, verde, coral) que tiñen toda la interfaz —fondo, tarjetas y bordes incluidos—, más modo claro/oscuro/automático.
 - **Progreso diario** y marcador **"Ahora"** sobre la actividad en curso.
 - **Todo local**: los datos se guardan en el dispositivo. No hay cuentas ni servidor.
 
@@ -118,10 +119,13 @@ src/
     RootScreen            Pestañas y estado compartido
     ScheduleScreen        Cronograma del día
     TodosScreen           Lista de pendientes
+    ReportScreen          Reporte de constancia y rachas
     SettingsScreen        Temas, notificaciones, importar/exportar
   components/             WeekStrip, TaskCard, TaskEditor, TimePicker, IconPicker,
-                          ScopeDialog, TodoRow, TabBar, ProgressRing, EmptyState
-  storage/                Persistencia local, hook de estado e importación JSON
+                          ScopeDialog, TodoRow, TabBar, StreakCalendar, ProgressRing,
+                          EmptyState
+  storage/                Persistencia local, hook de estado, estadísticas
+                          e importación JSON
   theme/                  Tokens, paletas de color, categorías, catálogo de iconos
   types/                  Modelo de datos
   utils/                  Fechas, sonido y notificaciones
@@ -135,3 +139,5 @@ public/                   manifest.json, sw.js e íconos
 - Una rutina se guarda una sola vez y se proyecta sobre cada día que le toca. Completarla queda registrado por día, así que marcarla hoy no la marca mañana.
 - Editar un solo día de una rutina guarda un *override* para esa fecha, en vez de duplicar la actividad; el resto de la serie no se toca.
 - El sonido se sintetiza con la Web Audio API en lugar de cargar un archivo, para no sumar peso al bundle.
+- El reporte solo puntúa días ya transcurridos: contar el plan de mañana como incumplido haría que todo informe se viera mal. Hoy sí cuenta, porque el avance parcial es informativo, pero no rompe la racha hasta que termina.
+- Cada tema define su propia rampa de neutros en vez de compartir una gris, que es lo que hace que cambie el fondo y no solo el acento. Los contrastes de los seis temas, en claro y oscuro, cumplen WCAG AA.

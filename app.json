@@ -15,10 +15,8 @@
     "android": {
       "package": "com.miguelusma.day2day",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#2563EB",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -30,11 +28,13 @@
       "shortName": "day2day",
       "lang": "es",
       "themeColor": "#2563EB",
-      "backgroundColor": "#F8FAFC",
+      "backgroundColor": "#F3F6FD",
       "display": "standalone",
       "orientation": "portrait",
       "description": "Tu cronograma diario: arma tu rutina y cúmplela, desde que te levantas hasta que te duermes."
     },
-    "plugins": ["expo-font"]
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

@@ -5,6 +5,7 @@ import { TabBar, type TabId } from '../components/TabBar';
 import { useTasks } from '../storage/useTasks';
 import { useTheme } from '../theme/ThemeProvider';
 import { toDayKey } from '../utils/date';
+import { ReportScreen } from './ReportScreen';
 import { ScheduleScreen } from './ScheduleScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { TodosScreen } from './TodosScreen';
@@ -60,6 +61,8 @@ export function RootScreen() {
             onDelete={store.deleteTodo}
           />
         ) : null}
+
+        {tab === 'report' ? <ReportScreen tasks={store.tasks} todos={store.todos} /> : null}
 
         {tab === 'settings' ? (
           <SettingsScreen tasks={store.tasks} onImport={store.importTasks} />

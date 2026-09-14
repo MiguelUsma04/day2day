@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4C8DF8"/>
+      <stop offset="55%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#1B45C4"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="58%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#sheen)"/>
+
+  <!--
+    The day as a ring, nearly closed: the gap at the top is where the check
+    enters, so the two marks read as one shape rather than overlapping ones.
+  -->
+  <circle cx="512" cy="512" r="268" fill="none" stroke="#FFFFFF" stroke-opacity="0.30"
+          stroke-width="46" stroke-linecap="round"
+          stroke-dasharray="1400 284" transform="rotate(-72 512 512)"/>
+
+  <!-- Completion mark, optically centred inside the ring. -->
+  <path d="M392 516 L474 598 L638 418" fill="none" stroke="#FFFFFF" stroke-width="76"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

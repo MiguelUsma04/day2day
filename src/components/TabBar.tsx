@@ -8,12 +8,13 @@ import type { IconName } from '../theme/icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, spacing, TOUCH_TARGET } from '../theme/tokens';
 
-export const TABS = ['schedule', 'todos', 'settings'] as const;
+export const TABS = ['schedule', 'todos', 'report', 'settings'] as const;
 export type TabId = (typeof TABS)[number];
 
 const META: Record<TabId, { label: string; icon: IconName; active: IconName }> = {
   schedule: { label: 'Cronograma', icon: 'calendar-outline', active: 'calendar' },
   todos: { label: 'Pendientes', icon: 'checkbox-outline', active: 'checkbox' },
+  report: { label: 'Progreso', icon: 'stats-chart-outline', active: 'stats-chart' },
   settings: { label: 'Ajustes', icon: 'settings-outline', active: 'settings' },
 };
 

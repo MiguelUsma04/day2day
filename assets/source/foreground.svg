@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Android masks the outer ~33%, so the mark sits inside the safe circle. -->
+  <g transform="translate(512 512) scale(0.66) translate(-512 -512)">
+    <circle cx="512" cy="512" r="268" fill="none" stroke="#FFFFFF" stroke-opacity="0.34"
+            stroke-width="46" stroke-linecap="round"
+            stroke-dasharray="1400 284" transform="rotate(-72 512 512)"/>
+    <path d="M392 516 L474 598 L638 418" fill="none" stroke="#FFFFFF" stroke-width="76"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

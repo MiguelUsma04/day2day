@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type {
-  EditScope,
-  Task,
-  TaskDraft,
-  TaskInstance,
-  Todo,
-  Weekday,
-} from '../types/task';
-import { fromDayKey } from '../utils/date';
+import type { EditScope, Task, TaskDraft, TaskInstance, Todo } from '../types/task';
+import { occursOn } from './occurrence';
 import { loadTasks, loadTodos, saveTasks, saveTodos } from './tasks';
 
 function createId(): string {
@@ -24,25 +17,6 @@ function sortInstances(items: TaskInstance[]): TaskInstance[] {
     if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
     return a.createdAt - b.createdAt;
   });
-}
-
-/** Does a repeating task land on this day? Repeats never apply before their start date. */
-function occursOn(task: Task, dayKey: string): boolean {
-  if (task.repeat.kind === 'none') return task.date === dayKey;
-  if (dayKey < task.date) return false;
-  if (task.skippedDays.includes(dayKey)) return false;
-
-  const weekday = fromDayKey(dayKey).getDay() as Weekday;
-  switch (task.repeat.kind) {
-    case 'daily':
-      return true;
-    case 'weekdays':
-      return weekday >= 1 && weekday <= 5;
-    case 'custom':
-      return task.repeat.days.includes(weekday);
-    default:
-      return false;
-  }
 }
 
 /** Applies any per-day override on top of the stored task. */
