@@ -10,7 +10,7 @@
  * worker and this file never caches index.html's HTML for longer than a request.
  */
 
-const CACHE = 'day2day-v4';
+const CACHE = 'day2day-v5';
 const APP_SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -100,4 +100,33 @@ self.addEventListener('notificationclick', (event) => {
       return self.clients.openWindow('/');
     }),
   );
+});
+
+/**
+ * Web Push delivery.
+ *
+ * The server signs and sends these, so they arrive even with the app closed —
+ * unlike the in-page timers, which iOS discards when it unloads the app.
+ */
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    // A malformed payload should still surface something useful.
+    payload = { title: 'day2day', body: event.data ? event.data.text() : '' };
+  }
+
+  const title = payload.title || 'day2day';
+  const options = {
+    body: payload.body || '',
+    tag: payload.tag || 'day2day',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    data: { url: payload.url || '/' },
+    // Reminders are time-critical; let them alert rather than arrive silently.
+    renotify: Boolean(payload.tag),
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
 });

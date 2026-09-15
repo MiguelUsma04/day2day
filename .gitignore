@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Web Push signing keys — the private key must never be committed
+.vapid-keys.json

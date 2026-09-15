@@ -26,17 +26,15 @@ import { MODES, useTheme, type ModePreference } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import type { Task, TaskDraft, Todo } from '../types/task';
 import { toDayKey } from '../utils/date';
-import {
-  armedCount,
-  getPermission,
-  isStandalone,
-  requestPermission,
-  scheduleReminders,
-  sendDelayedTestNotification,
-  sendTestNotification,
-  type PermissionState,
-} from '../utils/notifications';
+import { armedCount } from '../utils/notifications';
 import { isSoundEnabled, playComplete, setSoundEnabled } from '../utils/sound';
+import {
+  enablePush,
+  getState as getPushState,
+  lastSync,
+  sendTestPush,
+  type PushState,
+} from '../utils/webpush';
 
 const MODE_LABELS: Record<ModePreference, string> = {
   system: 'Automático',
@@ -115,7 +113,6 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
   const { colors, isDark, themeId, mode, options, setThemeId, setMode } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const [permission, setPermission] = useState<PermissionState>('unsupported');
   const [sound, setSound] = useState(isSoundEnabled());
   const [importText, setImportText] = useState('');
   const [replaceAll, setReplaceAll] = useState(false);
@@ -123,12 +120,18 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
   const [pendingClear, setPendingClear] = useState<ClearKind | null>(null);
 
   const [armed, setArmed] = useState(0);
+  const [pushState, setPushState] = useState<PushState>('unsupported');
+  const [pushSync, setPushSync] = useState<{ at: number; count: number } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setPermission(getPermission());
-    // Timers are armed by the root screen, possibly after this mounts, and a
-    // reminder firing changes the count, so poll rather than read once.
-    const sync = () => setArmed(armedCount());
+    // Push state can change outside this screen (permission granted, a sync
+    // completing), so poll rather than read once on mount.
+    const sync = () => {
+      setArmed(armedCount());
+      setPushState(getPushState());
+      setPushSync(lastSync());
+    };
     sync();
     const id = setInterval(sync, 2000);
     return () => clearInterval(id);
@@ -139,22 +142,44 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
     (t) => t.startMinutes !== null && t.reminderMinutes !== null,
   ).length;
 
-  const askPermission = useCallback(async () => {
+  const handleEnablePush = useCallback(async () => {
     void Haptics.selectionAsync();
-    const result = await requestPermission();
-    setPermission(result);
-    if (result === 'granted') {
-      // Timers could not be armed without permission, so arm them now.
-      scheduleReminders(tasks);
-      setArmed(armedCount());
-      await sendTestNotification();
-      setFeedback({ tone: 'ok', message: 'Listo. Te acabamos de enviar una notificación de prueba.' });
-    } else if (result === 'denied') {
+    setBusy(true);
+    const next = await enablePush(tasks);
+    setPushState(next);
+    setPushSync(lastSync());
+    setBusy(false);
+    if (next === 'subscribed') {
+      setFeedback({
+        tone: 'ok',
+        message: 'Avisos activados. Ahora llegan aunque la app esté cerrada.',
+      });
+    } else if (next === 'denied') {
       setFeedback({
         tone: 'error',
-        message: 'Las notificaciones están bloqueadas. Actívalas en Ajustes de iOS → day2day.',
+        message: 'Bloqueadas. Actívalas en Ajustes de iOS → day2day → Notificaciones.',
+      });
+    } else if (next === 'needs-install') {
+      setFeedback({
+        tone: 'error',
+        message: 'Primero añade la app a la pantalla de inicio desde Safari.',
       });
     }
+  }, [tasks]);
+
+  const handleTestPush = useCallback(async () => {
+    void Haptics.selectionAsync();
+    setBusy(true);
+    const result = await sendTestPush();
+    setBusy(false);
+    setFeedback(
+      result.ok
+        ? {
+            tone: 'ok',
+            message: 'Enviado desde el servidor. Cierra la app: debería llegar igual.',
+          }
+        : { tone: 'error', message: result.error ?? 'No se pudo enviar.' },
+    );
   }, []);
 
   const handleImport = useCallback(() => {
@@ -392,44 +417,65 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
 
         <Text style={[styles.cardTitle, { color: colors.foreground }]}>Notificaciones</Text>
         <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
-          {permission === 'granted'
-            ? isStandalone()
-              ? 'Activadas. Los avisos se programan al abrir la app y llegan a su hora mientras el sistema la mantenga en memoria.'
-              : 'Activadas en esta pestaña, pero iOS solo entrega avisos a la app instalada en la pantalla de inicio. Añádela desde Safari (Compartir → Añadir a pantalla de inicio).'
-            : permission === 'denied'
+          {pushState === 'subscribed'
+            ? 'Activadas. El servidor envía los avisos, así que llegan aunque la app esté cerrada.'
+            : pushState === 'denied'
               ? 'Bloqueadas. Actívalas en Ajustes de iOS → day2day → Notificaciones.'
-              : isStandalone()
-                ? 'Activa los avisos para tus recordatorios.'
-                : 'Para recibir avisos en el iPhone, primero añade la app a la pantalla de inicio desde Safari (Compartir → Añadir a pantalla de inicio).'}
+              : pushState === 'needs-install'
+                ? 'Para recibir avisos, añade la app a la pantalla de inicio desde Safari (Compartir → Añadir a pantalla de inicio).'
+                : pushState === 'unsupported'
+                  ? 'Este navegador no admite avisos.'
+                  : 'Activa los avisos para que te lleguen a la hora de cada actividad.'}
         </Text>
 
-        {permission === 'granted' ? (
-          <View style={[styles.statusRow, { borderColor: colors.border }]}>
-            <Ionicons
-              name={armed > 0 ? 'checkmark-circle' : 'information-circle-outline'}
-              size={16}
-              color={armed > 0 ? colors.accent : colors.mutedForeground}
-            />
-            <Text style={[styles.cardHint, { color: colors.mutedForeground, flex: 1 }]}>
-              {withReminder === 0
-                ? 'Ninguna actividad tiene aviso configurado. Ábrela y elige cuándo avisarte.'
-                : armed > 0
-                  ? `${armed} ${armed === 1 ? 'aviso programado' : 'avisos programados'} para hoy.`
-                  : 'No quedan avisos pendientes hoy. Se programan solos al abrir la app.'}
-            </Text>
-          </View>
-        ) : null}
+        {pushState === 'subscribed' ? (
+          <>
+            <View style={[styles.statusRow, { borderColor: colors.border }]}>
+              <Ionicons
+                name={withReminder > 0 ? 'checkmark-circle' : 'information-circle-outline'}
+                size={16}
+                color={withReminder > 0 ? colors.accent : colors.mutedForeground}
+              />
+              <Text style={[styles.cardHint, { color: colors.mutedForeground, flex: 1 }]}>
+                {withReminder === 0
+                  ? 'Ninguna actividad tiene aviso configurado. Ábrela y elige cuándo avisarte.'
+                  : `${withReminder} ${withReminder === 1 ? 'actividad avisa' : 'actividades avisan'} a su hora.` +
+                    (pushSync ? ' Sincronizado con el servidor.' : '')}
+              </Text>
+            </View>
 
-        {permission !== 'granted' ? (
+            <Pressable
+              onPress={handleTestPush}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy }}
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                { borderColor: colors.border, opacity: busy ? 0.5 : pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Ionicons name="paper-plane-outline" size={16} color={colors.foreground} />
+              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                Enviar prueba desde el servidor
+              </Text>
+            </Pressable>
+          </>
+        ) : (
           <Pressable
-            onPress={askPermission}
+            onPress={handleEnablePush}
+            disabled={busy || pushState === 'denied' || pushState === 'unsupported'}
             accessibilityRole="button"
-            disabled={permission === 'denied'}
+            accessibilityState={{ disabled: busy || pushState === 'denied' }}
             style={({ pressed }) => [
               styles.primaryBtn,
               {
                 backgroundColor: colors.primary,
-                opacity: permission === 'denied' ? 0.4 : pressed ? 0.85 : 1,
+                opacity:
+                  busy || pushState === 'denied' || pushState === 'unsupported'
+                    ? 0.4
+                    : pressed
+                      ? 0.85
+                      : 1,
               },
             ]}
           >
@@ -438,51 +484,6 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
               Activar notificaciones
             </Text>
           </Pressable>
-        ) : (
-          <>
-            <Pressable
-              onPress={() => {
-                void Haptics.selectionAsync();
-                void sendTestNotification();
-              }}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.secondaryBtn,
-                { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
-                Probar ahora
-              </Text>
-            </Pressable>
-
-            {/* An immediate test proves permission; only a delayed one proves
-                a scheduled reminder survives leaving the app. */}
-            <Pressable
-              onPress={() => {
-                void Haptics.selectionAsync();
-                const ok = sendDelayedTestNotification();
-                setFeedback(
-                  ok
-                    ? {
-                        tone: 'ok',
-                        message:
-                          'En 1 minuto llegará un aviso de prueba. Cierra la app y espera: si no llega, iOS la está suspendiendo.',
-                      }
-                    : { tone: 'error', message: 'No se pudo programar la prueba.' },
-                );
-              }}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.secondaryBtn,
-                { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-              ]}
-            >
-              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
-                Probar en 1 minuto
-              </Text>
-            </Pressable>
-          </>
         )}
       </View>
 

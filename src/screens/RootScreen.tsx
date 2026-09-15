@@ -6,6 +6,7 @@ import { useTasks } from '../storage/useTasks';
 import { useTheme } from '../theme/ThemeProvider';
 import { toDayKey } from '../utils/date';
 import { scheduleReminders } from '../utils/notifications';
+import { syncReminders } from '../utils/webpush';
 import { ReportScreen } from './ReportScreen';
 import { ScheduleScreen } from './ScheduleScreen';
 import { SettingsScreen } from './SettingsScreen';
@@ -26,6 +27,13 @@ export function RootScreen() {
    * re-armed whenever the app returns to the foreground: in-page timers do not
    * survive a suspended tab, which is the usual state of an installed PWA.
    */
+  // Keep the server's copy of the reminders current; it is what sends the
+  // pushes that survive the app being closed.
+  useEffect(() => {
+    if (store.isLoading) return;
+    void syncReminders(store.tasks);
+  }, [store.tasks, store.isLoading]);
+
   useEffect(() => {
     if (store.isLoading) return;
     scheduleReminders(store.tasks);

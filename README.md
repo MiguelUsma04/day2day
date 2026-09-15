@@ -10,7 +10,7 @@ Hecha con Expo (React Native) y desplegable como PWA instalable en el iPhone.
 - **Rutinas que se repiten**: cada día, de lunes a viernes, o días específicos. Se definen una vez y aparecen solas en cada día que corresponda. Al editarlas se pregunta si el cambio va a ese día o a toda la serie.
 - **Deslizar para actuar**: a la derecha completa (con sonido), a la izquierda elimina pidiendo confirmación.
 - **Lista de pendientes** aparte del cronograma, para lo que no tiene hora fija.
-- **Recordatorios** en el celular, a la hora de inicio por defecto y configurables por actividad.
+- **Recordatorios** por Web Push, que llegan con la app cerrada; a la hora de inicio por defecto y configurables por actividad.
 - **Iconos** por actividad, elegidos de un catálogo.
 - **Importar / exportar** el cronograma completo como JSON, y **respaldo** que además incluye los pendientes y el historial de rachas.
 - **Borrado en bloque** desde Ajustes: todas las actividades, los pendientes, solo el historial, o todo.
@@ -71,13 +71,47 @@ Lo que no se pueda leer se avisa al importar, sin bloquear el resto.
 
 ## Notificaciones
 
-Los recordatorios usan la API de notificaciones del navegador. En iPhone requieren que la app esté **añadida a la pantalla de inicio** (iOS 16.4 o superior); en una pestaña normal de Safari no se pueden activar.
+Los avisos se envían por **Web Push desde el servidor**, así que llegan aunque la app esté cerrada. (Los temporizadores dentro de la app no sirven para esto: iOS los descarta al descargar la app de memoria, y `TimestampTrigger` —lo que permitiría al service worker dispararlos solo— no existe en Safari.)
 
-Se programan con temporizadores dentro de la app, así que llegan mientras iOS la mantenga en memoria. Si el sistema la descarga —algo que hace por su cuenta tras un rato cerrada— esos temporizadores se pierden y el aviso no llega.
+Cómo funciona: el dispositivo registra una suscripción y sube *qué* quiere que le recuerden y *a qué minuto local*; un trabajo programado recorre los dispositivos y envía lo que toca. No hay cuentas: cada dispositivo guarda un id aleatorio y solo ve sus propios avisos.
 
-No hay forma de evitarlo sin servidor: la API que permitiría al service worker disparar una notificación programada (`TimestampTrigger`) no existe en Safari. Avisos garantizados con la app cerrada requieren Web Push y un backend que los envíe.
+En iPhone requieren la app **añadida a la pantalla de inicio** (iOS 16.4+); en una pestaña de Safari ni siquiera se puede pedir permiso.
 
-Ajustes incluye dos pruebas: una inmediata, que confirma los permisos, y otra a un minuto, que sirve para comprobar si los avisos programados sobreviven al salir de la app en tu dispositivo.
+### Puesta en marcha
+
+1. **Generar las claves VAPID** (una sola vez):
+
+   ```bash
+   node -e "console.log(JSON.stringify(require('web-push').generateVAPIDKeys(),null,2))"
+   ```
+
+2. **Variables de entorno en Vercel** (Settings → Environment Variables):
+
+   | Variable | Valor |
+   |---|---|
+   | `VAPID_PUBLIC_KEY` | la clave pública |
+   | `VAPID_PRIVATE_KEY` | la clave privada (nunca en el repo) |
+   | `VAPID_SUBJECT` | `mailto:tu@correo.com` |
+   | `PUSH_CRON_SECRET` | una cadena larga al azar, para que solo tu disparador pueda invocar el envío |
+   | `EXPO_PUBLIC_VAPID_PUBLIC_KEY` | la misma clave pública (la usa el cliente) |
+   | `BLOB_READ_WRITE_TOKEN` | lo añade Vercel al crear el Blob store |
+
+3. **Crear un Blob store**: en Vercel, Storage → Create → Blob. Guarda las suscripciones; no hace falta base de datos.
+
+4. **Programar el disparador.** El cron de Vercel en plan Hobby corre *una vez al día con ±59 min de margen*, inservible para avisar a una hora concreta, así que queda solo como barrido de reconciliación. Para la precisión al minuto usa un disparador externo gratuito, por ejemplo [cron-job.org](https://cron-job.org):
+
+   - URL: `https://TU-APP.vercel.app/api/push/send?key=EL_PUSH_CRON_SECRET`
+   - Intervalo: cada 5 minutos (el margen de tolerancia del servidor es de 12 min, así que ningún aviso se pierde)
+
+### Endpoints
+
+| Ruta | Qué hace |
+|---|---|
+| `POST /api/push/subscribe` | Registra el dispositivo y reemplaza sus recordatorios |
+| `POST /api/push/test` | Envía un push de prueba a ese dispositivo |
+| `GET /api/push/send` | Envía todo lo que toque ahora; lo invoca el disparador |
+
+`/api/push/send` es idempotente: cada recordatorio anota la fecha local en que se envió, así que repetir la llamada no duplica avisos, y uno que se haya pasado de hora se recupera en la siguiente pasada mientras siga dentro de los 12 minutos de margen.
 
 ## Desarrollo
 
@@ -134,6 +168,8 @@ src/
   theme/                  Tokens, paletas de color, categorías, catálogo de iconos
   types/                  Modelo de datos
   utils/                  Fechas, sonido y notificaciones
+api/push/                 Endpoints de Web Push (subscribe, send, test)
+api/_lib/store.js         Suscripciones y recordatorios en Vercel Blob
 scripts/build-pwa.js      Post-proceso del build web (manifest, service worker, meta de iOS)
 public/                   manifest.json, sw.js e íconos
 ```
