@@ -16,7 +16,6 @@ import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import type { EditScope, TaskDraft, TaskInstance } from '../types/task';
 import { friendlyDate, isToday, minutesSinceMidnight, toDayKey } from '../utils/date';
-import { scheduleReminders } from '../utils/notifications';
 import { playDelete } from '../utils/sound';
 
 type Props = {
@@ -65,11 +64,6 @@ export function ScheduleScreen({
   const dayKey = toDayKey(selectedDate);
   const doneCount = tasks.filter((t) => t.done).length;
   const viewingToday = isToday(dayKey);
-
-  // Re-arm reminders whenever the day's schedule changes.
-  useEffect(() => {
-    scheduleReminders(tasks, dayKey);
-  }, [tasks, dayKey]);
 
   const currentTaskId = useMemo(() => {
     if (!viewingToday) return null;

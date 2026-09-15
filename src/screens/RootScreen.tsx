@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { TabBar, type TabId } from '../components/TabBar';
 import { useTasks } from '../storage/useTasks';
 import { useTheme } from '../theme/ThemeProvider';
 import { toDayKey } from '../utils/date';
+import { scheduleReminders } from '../utils/notifications';
 import { ReportScreen } from './ReportScreen';
 import { ScheduleScreen } from './ScheduleScreen';
 import { SettingsScreen } from './SettingsScreen';
@@ -19,6 +20,39 @@ export function RootScreen() {
   const store = useTasks();
   const [tab, setTab] = useState<TabId>('schedule');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+
+  /**
+   * Reminders are armed from the whole task list, not the day on screen, and
+   * re-armed whenever the app returns to the foreground: in-page timers do not
+   * survive a suspended tab, which is the usual state of an installed PWA.
+   */
+  useEffect(() => {
+    if (store.isLoading) return;
+    scheduleReminders(store.tasks);
+
+    const rearm = () => scheduleReminders(store.tasks);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') rearm();
+    });
+
+    let detachVisibility: (() => void) | undefined;
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const onVisible = () => {
+        if (document.visibilityState === 'visible') rearm();
+      };
+      document.addEventListener('visibilitychange', onVisible);
+      window.addEventListener('focus', rearm);
+      detachVisibility = () => {
+        document.removeEventListener('visibilitychange', onVisible);
+        window.removeEventListener('focus', rearm);
+      };
+    }
+
+    return () => {
+      sub.remove();
+      detachVisibility?.();
+    };
+  }, [store.tasks, store.isLoading]);
 
   const dayKey = toDayKey(selectedDate);
   const tasks = store.getTasksForDay(dayKey);

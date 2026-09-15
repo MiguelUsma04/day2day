@@ -211,7 +211,7 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
         </Animated.View>
       </View>
 
-      <GestureDetector gesture={pan}>
+      <GestureDetector gesture={pan} touchAction="pan-y">
         <Animated.View style={{ transform: [{ translateX }] }}>
           <Pressable
             onPress={handlePress}

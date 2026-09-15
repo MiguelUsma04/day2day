@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
-import type { TaskInstance } from '../types/task';
-import { formatTime } from './date';
+import type { Task, Weekday } from '../types/task';
+import { formatTime, toDayKey } from './date';
 
 /**
  * Reminders for the installed web app.
@@ -10,9 +10,10 @@ import { formatTime } from './date';
  * API directly. On iOS that requires the app to be installed to the home screen
  * (16.4+); in a plain Safari tab permission cannot even be requested.
  *
- * Scheduling is done with in-page timers, which means reminders fire while the
- * app is open or recently backgrounded. Delivery with the app fully closed for
- * hours needs a push server, which this does not attempt.
+ * Timers are armed in-page, so reminders fire while the app is open or recently
+ * backgrounded. Delivery with the app fully closed for hours needs a push
+ * server, which this does not attempt — the re-arm on focus below is what makes
+ * the common case (app opened at some point during the day) work reliably.
  */
 
 export type PermissionState = 'unsupported' | 'default' | 'granted' | 'denied';
@@ -20,13 +21,11 @@ export type PermissionState = 'unsupported' | 'default' | 'granted' | 'denied';
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 /** Longest delay we arm at once; beyond this, setTimeout drifts badly. */
 const MAX_DELAY_MS = 6 * 60 * 60 * 1000;
+/** Fired reminders, so re-arming on focus does not repeat one already shown. */
+const fired = new Set<string>();
 
 function supported(): boolean {
-  return (
-    Platform.OS === 'web' &&
-    typeof window !== 'undefined' &&
-    'Notification' in window
-  );
+  return Platform.OS === 'web' && typeof window !== 'undefined' && 'Notification' in window;
 }
 
 /** True when running as an installed app rather than a browser tab. */
@@ -34,8 +33,7 @@ export function isStandalone(): boolean {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
   const iosStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone;
   return (
-    iosStandalone === true ||
-    window.matchMedia?.('(display-mode: standalone)').matches === true
+    iosStandalone === true || window.matchMedia?.('(display-mode: standalone)').matches === true
   );
 }
 
@@ -80,40 +78,68 @@ function clearAll() {
   timers.clear();
 }
 
+/** Does a repeating task land on this day? Mirrors the schedule's own rule. */
+function occursToday(task: Task, dayKey: string): boolean {
+  if (task.repeat.kind === 'none') return task.date === dayKey;
+  if (dayKey < task.date) return false;
+  if (task.skippedDays.includes(dayKey)) return false;
+
+  const [y, m, d] = dayKey.split('-').map(Number);
+  const weekday = new Date(y, m - 1, d).getDay() as Weekday;
+  switch (task.repeat.kind) {
+    case 'daily':
+      return true;
+    case 'weekdays':
+      return weekday >= 1 && weekday <= 5;
+    case 'custom':
+      return task.repeat.days.includes(weekday);
+    default:
+      return false;
+  }
+}
+
 /**
- * Re-arms reminders for the given day's tasks. Call whenever the schedule or
- * the selected day changes; it clears previously armed timers first.
+ * Arms reminders for everything still ahead today.
+ *
+ * Takes the full task list rather than one day's view, so reminders stay armed
+ * for today even while the user is browsing another date.
  */
-export function scheduleReminders(instances: TaskInstance[], dayKey: string) {
+export function scheduleReminders(tasks: Task[]) {
   clearAll();
   if (!supported() || Notification.permission !== 'granted') return;
 
   const now = new Date();
-  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
-    now.getDate(),
-  ).padStart(2, '0')}`;
-  // Only today's remaining reminders can meaningfully fire from a live page.
-  if (dayKey !== todayKey) return;
+  const todayKey = toDayKey(now);
+  const nowMs =
+    now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000;
 
-  const nowMs = now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000;
+  for (const task of tasks) {
+    if (!occursToday(task, todayKey)) continue;
+    if (task.startMinutes === null || task.reminderMinutes === null) continue;
+    if (task.completedDays.includes(todayKey)) continue;
 
-  for (const task of instances) {
-    if (task.done || task.startMinutes === null || task.reminderMinutes === null) continue;
+    // A per-day edit can move the time, so honour the override when present.
+    const override = task.overrides[todayKey];
+    const startMinutes = override?.startMinutes ?? task.startMinutes;
+    const title = override?.title ?? task.title;
+    if (startMinutes === null) continue;
 
-    const fireAtMs = (task.startMinutes - task.reminderMinutes) * 60000;
-    const delay = fireAtMs - nowMs;
+    const key = `${task.id}:${todayKey}`;
+    if (fired.has(key)) continue;
+
+    const delay = (startMinutes - task.reminderMinutes) * 60000 - nowMs;
     if (delay <= 0 || delay > MAX_DELAY_MS) continue;
 
-    const key = `${task.id}:${task.dayKey}`;
     const lead =
       task.reminderMinutes === 0
-        ? 'Empieza ahora'
-        : `En ${task.reminderMinutes} min · ${formatTime(task.startMinutes)}`;
+        ? `Empieza ahora · ${formatTime(startMinutes)}`
+        : `En ${task.reminderMinutes} min · ${formatTime(startMinutes)}`;
 
     timers.set(
       key,
       setTimeout(() => {
-        void show(task.title, lead, key);
+        fired.add(key);
+        void show(title, lead, key);
         timers.delete(key);
       }, delay),
     );
@@ -122,6 +148,11 @@ export function scheduleReminders(instances: TaskInstance[], dayKey: string) {
 
 export function cancelReminders() {
   clearAll();
+}
+
+/** How many reminders are currently armed; used by the settings screen. */
+export function armedCount(): number {
+  return timers.size;
 }
 
 /** Fires a sample notification so the user can confirm it works. */

@@ -10,7 +10,7 @@ Hecha con Expo (React Native) y desplegable como PWA instalable en el iPhone.
 - **Rutinas que se repiten**: cada día, de lunes a viernes, o días específicos. Se definen una vez y aparecen solas en cada día que corresponda. Al editarlas se pregunta si el cambio va a ese día o a toda la serie.
 - **Deslizar para actuar**: a la derecha completa (con sonido), a la izquierda elimina pidiendo confirmación.
 - **Lista de pendientes** aparte del cronograma, para lo que no tiene hora fija.
-- **Recordatorios** en el celular, con aviso configurable por actividad.
+- **Recordatorios** en el celular, activos por defecto 10 minutos antes y configurables por actividad.
 - **Iconos** por actividad, elegidos de un catálogo.
 - **Importar / exportar** el cronograma completo como JSON, y **respaldo** que además incluye los pendientes y el historial de rachas.
 - **Reporte de constancia**: porcentaje cumplido, rachas, días perfectos, calendario de los últimos días y qué hábitos se te dan mejor o peor.

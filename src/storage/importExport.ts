@@ -131,8 +131,10 @@ function parseDuration(value: unknown): number {
   return 30;
 }
 
-function parseReminder(value: unknown): number | null {
-  if (value === null || value === undefined || value === false) return null;
+/** Absent means "use the default"; an explicit null or false means "no reminder". */
+function parseReminder(value: unknown, hasTime: boolean): number | null {
+  if (value === null || value === false) return null;
+  if (value === undefined) return hasTime ? 10 : null;
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
     return Math.min(180, Math.round(value));
   }
@@ -178,6 +180,7 @@ export function parseImport(raw: string, defaultDate: string): ImportResult {
       return;
     }
 
+    const startMinutes = parseTime(e.time ?? e.startTime, label, warnings);
     const repeat = parseRepeat(e.repeat, e.days, label, warnings);
     const icon = typeof e.icon === 'string' && isKnownIcon(e.icon) ? e.icon : undefined;
     if (typeof e.icon === 'string' && !icon) {
@@ -188,12 +191,15 @@ export function parseImport(raw: string, defaultDate: string): ImportResult {
       title,
       notes: typeof e.notes === 'string' && e.notes.trim() ? e.notes.trim() : undefined,
       date: typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : defaultDate,
-      startMinutes: parseTime(e.time ?? e.startTime, label, warnings),
+      startMinutes: startMinutes,
       durationMinutes: parseDuration(e.duration ?? e.durationMinutes),
       category: parseCategory(e.category, label, warnings),
       icon,
       repeat,
-      reminderMinutes: parseReminder(e.reminder ?? e.reminderMinutes),
+      reminderMinutes: parseReminder(
+        'reminder' in e ? e.reminder : e.reminderMinutes,
+        startMinutes !== null,
+      ),
     });
   });
 

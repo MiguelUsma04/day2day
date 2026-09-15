@@ -26,9 +26,11 @@ import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/to
 import type { Task, TaskDraft, Todo } from '../types/task';
 import { toDayKey } from '../utils/date';
 import {
+  armedCount,
   getPermission,
   isStandalone,
   requestPermission,
+  scheduleReminders,
   sendTestNotification,
   type PermissionState,
 } from '../utils/notifications';
@@ -87,15 +89,31 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore }: Props) {
   const [replaceAll, setReplaceAll] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null);
 
+  const [armed, setArmed] = useState(0);
+
   useEffect(() => {
     setPermission(getPermission());
+    // Timers are armed by the root screen, possibly after this mounts, and a
+    // reminder firing changes the count, so poll rather than read once.
+    const sync = () => setArmed(armedCount());
+    sync();
+    const id = setInterval(sync, 2000);
+    return () => clearInterval(id);
   }, []);
+
+  // How many activities still have a reminder ahead of them today.
+  const withReminder = tasks.filter(
+    (t) => t.startMinutes !== null && t.reminderMinutes !== null,
+  ).length;
 
   const askPermission = useCallback(async () => {
     void Haptics.selectionAsync();
     const result = await requestPermission();
     setPermission(result);
     if (result === 'granted') {
+      // Timers could not be armed without permission, so arm them now.
+      scheduleReminders(tasks);
+      setArmed(armedCount());
       await sendTestNotification();
       setFeedback({ tone: 'ok', message: 'Listo. Te acabamos de enviar una notificación de prueba.' });
     } else if (result === 'denied') {
@@ -334,6 +352,23 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore }: Props) {
                 : 'Para recibir avisos en el iPhone, primero añade la app a la pantalla de inicio desde Safari (Compartir → Añadir a pantalla de inicio).'}
         </Text>
 
+        {permission === 'granted' ? (
+          <View style={[styles.statusRow, { borderColor: colors.border }]}>
+            <Ionicons
+              name={armed > 0 ? 'checkmark-circle' : 'information-circle-outline'}
+              size={16}
+              color={armed > 0 ? colors.accent : colors.mutedForeground}
+            />
+            <Text style={[styles.cardHint, { color: colors.mutedForeground, flex: 1 }]}>
+              {withReminder === 0
+                ? 'Ninguna actividad tiene aviso configurado. Ábrela y elige cuándo avisarte.'
+                : armed > 0
+                  ? `${armed} ${armed === 1 ? 'aviso programado' : 'avisos programados'} para hoy.`
+                  : 'No quedan avisos pendientes hoy. Se programan solos al abrir la app.'}
+            </Text>
+          </View>
+        ) : null}
+
         {permission !== 'granted' ? (
           <Pressable
             onPress={askPermission}
@@ -568,6 +603,15 @@ const styles = StyleSheet.create({
   switchText: { flex: 1, gap: 2 },
   optionLabel: { fontFamily: fontFamily.semibold, fontSize: fontSize.footnote },
   divider: { height: 1, marginVertical: spacing.sm },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+  },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',

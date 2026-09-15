@@ -38,6 +38,9 @@ const MIN_DURATION = 5;
 const MAX_DURATION = 12 * 60;
 
 /** Minutes before the start time; null means no reminder. */
+/** Default lead time for a new activity, so reminders work without opt-in. */
+const DEFAULT_REMINDER = 10;
+
 const REMINDERS: { value: number | null; label: string }[] = [
   { value: null, label: 'Sin aviso' },
   { value: 0, label: 'A la hora' },
@@ -85,7 +88,7 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
   const [category, setCategory] = useState<Category>('personal');
   const [repeat, setRepeat] = useState<Repeat>(NO_REPEAT);
   const [icon, setIcon] = useState<IconName | undefined>(undefined);
-  const [reminderMinutes, setReminderMinutes] = useState<number | null>(null);
+  const [reminderMinutes, setReminderMinutes] = useState<number | null>(DEFAULT_REMINDER);
   const [touched, setTouched] = useState(false);
 
   // Reset the form each time the sheet opens, so a stale draft never leaks in.
@@ -98,7 +101,8 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
     setCategory(task?.category ?? 'personal');
     setRepeat(task?.repeat ?? NO_REPEAT);
     setIcon((task?.icon as IconName | undefined) ?? undefined);
-    setReminderMinutes(task?.reminderMinutes ?? null);
+    // Existing activities keep whatever they had, including "no reminder".
+    setReminderMinutes(task ? task.reminderMinutes : DEFAULT_REMINDER);
     setTouched(false);
   }, [visible, task]);
 
