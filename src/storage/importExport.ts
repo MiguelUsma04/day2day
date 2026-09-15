@@ -131,10 +131,13 @@ function parseDuration(value: unknown): number {
   return 30;
 }
 
-/** Absent means "use the default"; an explicit null or false means "no reminder". */
+/**
+ * Absent means "use the default"; an explicit null or false means "no reminder".
+ * The default is 0, i.e. at the activity's start time.
+ */
 function parseReminder(value: unknown, hasTime: boolean): number | null {
   if (value === null || value === false) return null;
-  if (value === undefined) return hasTime ? 10 : null;
+  if (value === undefined) return hasTime ? 0 : null;
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
     return Math.min(180, Math.round(value));
   }

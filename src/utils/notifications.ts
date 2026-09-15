@@ -132,7 +132,7 @@ export function scheduleReminders(tasks: Task[]) {
 
     const lead =
       task.reminderMinutes === 0
-        ? `Empieza ahora · ${formatTime(startMinutes)}`
+        ? `Es hora · ${formatTime(startMinutes)}`
         : `En ${task.reminderMinutes} min · ${formatTime(startMinutes)}`;
 
     timers.set(

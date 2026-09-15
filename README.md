@@ -10,7 +10,7 @@ Hecha con Expo (React Native) y desplegable como PWA instalable en el iPhone.
 - **Rutinas que se repiten**: cada día, de lunes a viernes, o días específicos. Se definen una vez y aparecen solas en cada día que corresponda. Al editarlas se pregunta si el cambio va a ese día o a toda la serie.
 - **Deslizar para actuar**: a la derecha completa (con sonido), a la izquierda elimina pidiendo confirmación.
 - **Lista de pendientes** aparte del cronograma, para lo que no tiene hora fija.
-- **Recordatorios** en el celular, activos por defecto 10 minutos antes y configurables por actividad.
+- **Recordatorios** en el celular, a la hora de inicio por defecto y configurables por actividad.
 - **Iconos** por actividad, elegidos de un catálogo.
 - **Importar / exportar** el cronograma completo como JSON, y **respaldo** que además incluye los pendientes y el historial de rachas.
 - **Borrado en bloque** desde Ajustes: todas las actividades, los pendientes, solo el historial, o todo.
@@ -59,7 +59,7 @@ Se acepta una lista directa, o un objeto con la propiedad `tasks`:
 | `icon` | no | Nombre de Ionicons, p. ej. `sunny-outline`, `barbell-outline`, `book-outline` |
 | `repeat` | no | `none`, `daily`, `weekdays`, `custom`. Por defecto `none` |
 | `days` | solo con `custom` | `["lun","mar","mie","jue","vie","sab","dom"]` o números `0`-`6` (0 = domingo) |
-| `reminder` | no | Minutos de antelación del aviso (`0` = a la hora). Sin él, no avisa |
+| `reminder` | no | Minutos de antelación del aviso. Sin él, avisa a la hora de inicio; usa `null` para no avisar |
 | `notes` | no | Texto |
 | `date` | no | `"YYYY-MM-DD"`, solo para actividades sin repetición. Por defecto, hoy |
 
