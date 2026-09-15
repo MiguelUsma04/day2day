@@ -188,7 +188,11 @@ export async function syncReminders(tasks: Task[]): Promise<boolean> {
 /** Asks the server whether it currently knows this device. */
 export async function isRegistered(): Promise<boolean> {
   try {
-    const res = await fetch('/api/push/status?deviceId=' + encodeURIComponent(deviceId()));
+    // Must bypass the cache: the service worker would otherwise keep serving
+    // the stale "not registered" answer from before the device was stored.
+    const res = await fetch('/api/push/status?deviceId=' + encodeURIComponent(deviceId()), {
+      cache: 'no-store',
+    });
     if (!res.ok) return false;
     const data = await res.json();
     return data?.registered === true;

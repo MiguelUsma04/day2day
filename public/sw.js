@@ -10,7 +10,7 @@
  * worker and this file never caches index.html's HTML for longer than a request.
  */
 
-const CACHE = 'day2day-v5';
+const CACHE = 'day2day-v6';
 const APP_SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -38,6 +38,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // Never cache API calls: they report live state and a stale copy is worse
+  // than no answer at all.
+  if (url.pathname.startsWith('/api/')) return;
 
   // Navigations: try the network, fall back to the cached shell when offline.
   if (request.mode === 'navigate') {
