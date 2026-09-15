@@ -37,5 +37,27 @@ export default async function handler(req, res) {
     }
   }
 
+  // Run the real read path, surfacing the error the store module swallows.
+  if (target) {
+    try {
+      const r = await get(target, { access: 'private' });
+      const text = await new Response(r.stream).text();
+      out.parsed = {
+        length: text.length,
+        head: text.slice(0, 80),
+        json: (() => {
+          try {
+            const o = JSON.parse(text);
+            return { hasSubscription: !!o.subscription, reminders: o.reminders?.length ?? 0 };
+          } catch (e) {
+            return 'JSON PARSE FAIL: ' + String(e?.message).slice(0, 80);
+          }
+        })(),
+      };
+    } catch (e) {
+      out.parsed = 'READ FAIL: ' + String(e?.message ?? e).slice(0, 200);
+    }
+  }
+
   return res.status(200).json(out);
 }
