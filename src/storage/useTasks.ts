@@ -95,7 +95,12 @@ export function useTasks() {
             return { ...t, ...patch, overrides: clearedOverrides };
           }
 
-          const { repeat: _ignored, reminderMinutes: _r2, ...dayFields } = patch;
+          const {
+            repeat: _ignored,
+            reminderMinutes: _r2,
+            date: _r3,
+            ...dayFields
+          } = patch;
           return {
             ...t,
             overrides: {

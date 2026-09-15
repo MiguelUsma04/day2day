@@ -87,9 +87,11 @@ function Wheel<T extends string | number>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const commit = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const raw = event.nativeEvent.contentOffset.y / ITEM_HEIGHT;
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const select = useCallback(
+    (offsetY: number) => {
+      const raw = offsetY / ITEM_HEIGHT;
       const next = items[Math.min(items.length - 1, Math.max(0, Math.round(raw)))];
       if (next === undefined || next === lastReported.current) return;
       lastReported.current = next;
@@ -99,6 +101,37 @@ function Wheel<T extends string | number>({
     [items, onSelect],
   );
 
+  /**
+   * Reads the resting position rather than the one at finger-up.
+   *
+   * With snapToInterval the wheel keeps moving after the drag ends, so
+   * committing on onScrollEndDrag captured a half-scrolled offset and the value
+   * silently stayed on the previous item. Tracking every scroll frame and
+   * committing once it goes quiet always reads the settled row.
+   */
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetY = event.nativeEvent.contentOffset.y;
+      if (settle.current) clearTimeout(settle.current);
+      settle.current = setTimeout(() => select(offsetY), 90);
+    },
+    [select],
+  );
+
+  const commit = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (settle.current) clearTimeout(settle.current);
+      select(event.nativeEvent.contentOffset.y);
+    },
+    [select],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (settle.current) clearTimeout(settle.current);
+    };
+  }, []);
+
   return (
     <View style={{ width }} accessibilityLabel={label}>
       <ScrollView
@@ -106,9 +139,10 @@ function Wheel<T extends string | number>({
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_HEIGHT}
         decelerationRate="fast"
-        // Momentum fires on native; the plain scroll end covers web.
+        // Momentum end is authoritative where it fires; onScroll covers the
+        // web, where a snap can settle without a momentum event.
         onMomentumScrollEnd={commit}
-        onScrollEndDrag={commit}
+        onScroll={onScroll}
         scrollEventThrottle={16}
         style={{ height: WHEEL_HEIGHT }}
         contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * PADDING_ROWS }}
