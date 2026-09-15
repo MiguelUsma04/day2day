@@ -32,6 +32,7 @@ import { isSoundEnabled, playComplete, setSoundEnabled } from '../utils/sound';
 import {
   enablePush,
   getState as getPushState,
+  buildReminders,
   isRegistered,
   lastSync,
   serverStatus,
@@ -166,10 +167,13 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
     };
   }, [pushState, pushSync]);
 
-  // How many activities still have a reminder ahead of them today.
+  // How many activities have a reminder configured.
   const withReminder = tasks.filter(
     (t) => t.startMinutes !== null && t.reminderMinutes !== null,
   ).length;
+  // What the device would actually upload: one entry per recurring activity
+  // plus one for each day edited on its own.
+  const expectedOnServer = buildReminders(tasks).length;
 
   const handleEnablePush = useCallback(async () => {
     void Haptics.selectionAsync();
@@ -499,8 +503,8 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
                   ? 'El servidor todavía no reconoce este dispositivo. Toca "Enviar prueba" para registrarlo.'
                   : withReminder === 0
                     ? 'Ninguna actividad tiene aviso configurado. Ábrela y elige cuándo avisarte.'
-                    : serverCount !== null && serverCount !== withReminder
-                      ? `El servidor tiene ${serverCount} de tus ${withReminder} avisos. Toca "Sincronizar ahora".`
+                    : serverCount !== null && serverCount < expectedOnServer
+                      ? `Faltan avisos por subir (${serverCount} de ${expectedOnServer}). Toca "Sincronizar ahora".`
                       : `${withReminder} ${withReminder === 1 ? 'actividad avisa' : 'actividades avisan'} a su hora, y el servidor ya las tiene.`}
               </Text>
             </View>
@@ -515,7 +519,10 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
                 setBusy(false);
                 setFeedback(
                   ok
-                    ? { tone: 'ok', message: `Sincronizado: el servidor tiene ${status?.reminders ?? 0} avisos.` }
+                    ? {
+                        tone: 'ok',
+                        message: `Sincronizado. El servidor tiene tus ${withReminder} actividades con aviso.`,
+                      }
                     : { tone: 'error', message: 'No se pudo sincronizar.' },
                 );
               }}
