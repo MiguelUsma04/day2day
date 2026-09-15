@@ -187,6 +187,21 @@ export function useTasks() {
     setTodos((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  /** Wipes data in bulk. Each part is opt-in so nothing goes beyond the request. */
+  const clearData = useCallback(
+    (what: { tasks?: boolean; todos?: boolean; history?: boolean }) => {
+      if (what.tasks) setTasks([]);
+      else if (what.history) {
+        // Keep the activities, forget only what was ticked off.
+        setTasks((prev) =>
+          prev.map((t) => ({ ...t, completedDays: [], skippedDays: [], overrides: {} })),
+        );
+      }
+      if (what.todos) setTodos([]);
+    },
+    [],
+  );
+
   /** Replaces everything from a backup, history included. */
   const restoreBackup = useCallback((nextTasks: Task[], nextTodos: Todo[]) => {
     setTasks(nextTasks);
@@ -210,6 +225,7 @@ export function useTasks() {
     skipOccurrence,
     importTasks,
     restoreBackup,
+    clearData,
     getTasksForDay,
     markedDays,
     addTodo,

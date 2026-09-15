@@ -20,6 +20,7 @@ import {
   parseBackup,
   parseImport,
 } from '../storage/importExport';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { shadow } from '../theme/shadows';
 import { MODES, useTheme, type ModePreference } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
@@ -47,6 +48,36 @@ type Props = {
   todos: Todo[];
   onImport: (tasks: TaskDraft[], replace: boolean) => number;
   onRestore: (tasks: Task[], todos: Todo[]) => void;
+  onClear: (what: { tasks?: boolean; todos?: boolean; history?: boolean }) => void;
+};
+
+/** What a bulk-delete option removes, and how it is described before doing it. */
+type ClearKind = 'tasks' | 'todos' | 'history' | 'all';
+
+const CLEAR_COPY: Record<ClearKind, { label: string; title: string; message: string }> = {
+  tasks: {
+    label: 'Borrar todas las actividades',
+    title: '¿Borrar todas las actividades?',
+    message:
+      'Se eliminarán todas las actividades del cronograma, incluidas las rutinas que se repiten. Los pendientes se conservan.',
+  },
+  todos: {
+    label: 'Borrar todos los pendientes',
+    title: '¿Borrar todos los pendientes?',
+    message: 'Se eliminará la lista de pendientes de todos los días. El cronograma se conserva.',
+  },
+  history: {
+    label: 'Borrar solo el historial',
+    title: '¿Borrar el historial?',
+    message:
+      'Las actividades se conservan, pero se olvidará qué días las cumpliste: el reporte de progreso empezará de cero.',
+  },
+  all: {
+    label: 'Borrar todo',
+    title: '¿Borrar absolutamente todo?',
+    message:
+      'Se eliminarán las actividades, los pendientes y el historial de rachas. Guarda un respaldo antes si quieres poder recuperarlo.',
+  },
 };
 
 /** Triggers a file download in the browser; a no-op elsewhere. */
@@ -79,7 +110,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export function SettingsScreen({ tasks, todos, onImport, onRestore }: Props) {
+export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: Props) {
   const { colors, isDark, themeId, mode, options, setThemeId, setMode } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -88,6 +119,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore }: Props) {
   const [importText, setImportText] = useState('');
   const [replaceAll, setReplaceAll] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null);
+  const [pendingClear, setPendingClear] = useState<ClearKind | null>(null);
 
   const [armed, setArmed] = useState(0);
 
@@ -195,6 +227,22 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore }: Props) {
       message: `Restaurado: ${result.tasks.length} actividades y ${result.todos.length} pendientes, con tu historial.`,
     });
   }, [importText, onRestore]);
+
+  const confirmClear = useCallback(() => {
+    if (!pendingClear) return;
+    const removed =
+      pendingClear === 'tasks'
+        ? { tasks: true }
+        : pendingClear === 'todos'
+          ? { todos: true }
+          : pendingClear === 'history'
+            ? { history: true }
+            : { tasks: true, todos: true, history: true };
+    onClear(removed);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setFeedback({ tone: 'ok', message: 'Listo, ya se borró.' });
+    setPendingClear(null);
+  }, [pendingClear, onClear]);
 
   const handleExport = useCallback(async () => {
     void Haptics.selectionAsync();
@@ -563,6 +611,65 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore }: Props) {
           </View>
         ) : null}
       </View>
+
+      {/* ---- Danger zone ---- */}
+      <View style={[...card, { borderColor: colors.destructive }]}>
+        <Text style={[styles.cardTitle, { color: colors.destructive }]}>Borrar datos</Text>
+        <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
+          No se puede deshacer. Si quieres poder volver atrás, guarda un respaldo primero.
+        </Text>
+
+        {(['tasks', 'todos', 'history', 'all'] as ClearKind[]).map((kind) => {
+          const isAll = kind === 'all';
+          const disabled =
+            (kind === 'tasks' && tasks.length === 0) ||
+            (kind === 'todos' && todos.length === 0) ||
+            (isAll && tasks.length === 0 && todos.length === 0);
+          return (
+            <Pressable
+              key={kind}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setPendingClear(kind);
+              }}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityState={{ disabled }}
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                {
+                  borderColor: isAll ? colors.destructive : colors.border,
+                  opacity: disabled ? 0.4 : pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Ionicons
+                name={isAll ? 'trash' : 'trash-outline'}
+                size={16}
+                color={isAll ? colors.destructive : colors.foreground}
+              />
+              <Text
+                style={[
+                  styles.secondaryBtnText,
+                  { color: isAll ? colors.destructive : colors.foreground },
+                ]}
+              >
+                {CLEAR_COPY[kind].label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <ConfirmDialog
+        visible={pendingClear !== null}
+        title={pendingClear ? CLEAR_COPY[pendingClear].title : ''}
+        message={pendingClear ? CLEAR_COPY[pendingClear].message : ''}
+        confirmLabel="Sí, borrar"
+        destructive
+        onCancel={() => setPendingClear(null)}
+        onConfirm={confirmClear}
+      />
 
       <Text style={[styles.footer, { color: colors.mutedForeground }]}>
         Tus datos se guardan solo en este dispositivo.

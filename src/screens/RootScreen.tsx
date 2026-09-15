@@ -104,6 +104,7 @@ export function RootScreen() {
             todos={store.todos}
             onImport={store.importTasks}
             onRestore={store.restoreBackup}
+            onClear={store.clearData}
           />
         ) : null}
       </View>
