@@ -32,6 +32,7 @@ import {
   isStandalone,
   requestPermission,
   scheduleReminders,
+  sendDelayedTestNotification,
   sendTestNotification,
   type PermissionState,
 } from '../utils/notifications';
@@ -392,7 +393,9 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
         <Text style={[styles.cardTitle, { color: colors.foreground }]}>Notificaciones</Text>
         <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
           {permission === 'granted'
-            ? 'Activadas. Los recordatorios llegan mientras la app haya estado abierta durante el día.'
+            ? isStandalone()
+              ? 'Activadas. Los avisos se programan al abrir la app y llegan a su hora mientras el sistema la mantenga en memoria.'
+              : 'Activadas en esta pestaña, pero iOS solo entrega avisos a la app instalada en la pantalla de inicio. Añádela desde Safari (Compartir → Añadir a pantalla de inicio).'
             : permission === 'denied'
               ? 'Bloqueadas. Actívalas en Ajustes de iOS → day2day → Notificaciones.'
               : isStandalone()
@@ -436,21 +439,50 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
             </Text>
           </Pressable>
         ) : (
-          <Pressable
-            onPress={() => {
-              void Haptics.selectionAsync();
-              void sendTestNotification();
-            }}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.secondaryBtn,
-              { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
-              Enviar notificación de prueba
-            </Text>
-          </Pressable>
+          <>
+            <Pressable
+              onPress={() => {
+                void Haptics.selectionAsync();
+                void sendTestNotification();
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                Probar ahora
+              </Text>
+            </Pressable>
+
+            {/* An immediate test proves permission; only a delayed one proves
+                a scheduled reminder survives leaving the app. */}
+            <Pressable
+              onPress={() => {
+                void Haptics.selectionAsync();
+                const ok = sendDelayedTestNotification();
+                setFeedback(
+                  ok
+                    ? {
+                        tone: 'ok',
+                        message:
+                          'En 1 minuto llegará un aviso de prueba. Cierra la app y espera: si no llega, iOS la está suspendiendo.',
+                      }
+                    : { tone: 'error', message: 'No se pudo programar la prueba.' },
+                );
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                Probar en 1 minuto
+              </Text>
+            </Pressable>
+          </>
         )}
       </View>
 

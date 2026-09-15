@@ -46,7 +46,7 @@ const DEFAULT_REMINDER = 0;
 
 const REMINDERS: { value: number | null; label: string }[] = [
   { value: null, label: 'Sin aviso' },
-  { value: 0, label: 'A la hora' },
+  { value: 0, label: 'Justo a esa hora' },
   { value: 2, label: '2 min antes' },
   { value: 5, label: '5 min antes' },
   { value: 10, label: '10 min antes' },

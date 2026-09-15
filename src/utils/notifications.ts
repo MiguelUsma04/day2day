@@ -159,3 +159,15 @@ export function armedCount(): number {
 export async function sendTestNotification() {
   await show('day2day', 'Las notificaciones están funcionando.', 'day2day-test');
 }
+
+/**
+ * Schedules a notification a minute out, so the user can check that a *delayed*
+ * reminder survives leaving the app — the case an immediate test cannot prove.
+ */
+export function sendDelayedTestNotification(): boolean {
+  if (!supported() || Notification.permission !== 'granted') return false;
+  setTimeout(() => {
+    void show('day2day', 'Prueba de 1 minuto: los avisos programados funcionan.', 'day2day-delayed');
+  }, 60000);
+  return true;
+}

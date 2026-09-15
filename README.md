@@ -73,7 +73,11 @@ Lo que no se pueda leer se avisa al importar, sin bloquear el resto.
 
 Los recordatorios usan la API de notificaciones del navegador. En iPhone requieren que la app esté **añadida a la pantalla de inicio** (iOS 16.4 o superior); en una pestaña normal de Safari no se pueden activar.
 
-Se programan desde la propia app, así que llegan mientras la app haya estado abierta durante el día. Para avisos garantizados con la app cerrada durante horas haría falta un servidor de push, que esta versión no incluye.
+Se programan con temporizadores dentro de la app, así que llegan mientras iOS la mantenga en memoria. Si el sistema la descarga —algo que hace por su cuenta tras un rato cerrada— esos temporizadores se pierden y el aviso no llega.
+
+No hay forma de evitarlo sin servidor: la API que permitiría al service worker disparar una notificación programada (`TimestampTrigger`) no existe en Safari. Avisos garantizados con la app cerrada requieren Web Push y un backend que los envíe.
+
+Ajustes incluye dos pruebas: una inmediata, que confirma los permisos, y otra a un minuto, que sirve para comprobar si los avisos programados sobreviven al salir de la app en tu dispositivo.
 
 ## Desarrollo
 
