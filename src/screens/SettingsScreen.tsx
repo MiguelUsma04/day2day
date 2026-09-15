@@ -17,6 +17,7 @@ import {
   buildBackup,
   buildExport,
   buildSample,
+  looksLikeBackup,
   parseBackup,
   parseImport,
 } from '../storage/importExport';
@@ -206,6 +207,15 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
   }, [tasks]);
 
   const handleImport = useCallback(() => {
+    if (looksLikeBackup(importText)) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setFeedback({
+        tone: 'error',
+        message:
+          'Eso es un respaldo. Toca "Restaurar respaldo" justo debajo para recuperarlo completo.',
+      });
+      return;
+    }
     const result = parseImport(importText, toDayKey(new Date()));
     if (!result.ok) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

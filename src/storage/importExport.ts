@@ -144,6 +144,28 @@ function parseReminder(value: unknown, hasTime: boolean): number | null {
   return null;
 }
 
+/** True when the document is a backup rather than the shareable import format. */
+export function looksLikeBackup(raw: string): boolean {
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return false;
+    const p = parsed as { kind?: unknown; tasks?: unknown };
+    if (p.kind === 'backup') return true;
+    // Older or hand-edited backups may lack `kind`; the field shape gives it away.
+    return (
+      Array.isArray(p.tasks) &&
+      p.tasks.some(
+        (t) =>
+          typeof t === 'object' &&
+          t !== null &&
+          ('startMinutes' in t || 'completedDays' in t),
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Parses the pasted document into task drafts, reporting what it could not read. */
 export function parseImport(raw: string, defaultDate: string): ImportResult {
   let parsed: unknown;
@@ -151,6 +173,14 @@ export function parseImport(raw: string, defaultDate: string): ImportResult {
     parsed = JSON.parse(raw);
   } catch {
     return { ok: false, error: 'El texto no es un JSON válido. Revisa comillas y comas.' };
+  }
+
+  if (looksLikeBackup(raw)) {
+    return {
+      ok: false,
+      error:
+        'Esto es un respaldo, no un cronograma para importar. Usa el botón "Restaurar respaldo" para no perder las horas ni el historial.',
+    };
   }
 
   const list = Array.isArray(parsed)
