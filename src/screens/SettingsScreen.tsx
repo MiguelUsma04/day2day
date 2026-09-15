@@ -172,6 +172,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
     const next = await enablePush(tasks);
     setPushState(next);
     setPushSync(lastSync());
+    if (next === 'subscribed') void isRegistered().then(setRegistered);
     setBusy(false);
     if (next === 'subscribed') {
       setFeedback({
@@ -196,6 +197,13 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
     setBusy(true);
     const result = await sendTestPush(tasks);
     setBusy(false);
+    if (result.ok) {
+      // Delivery is proof of registration; reflect it without waiting a poll.
+      setRegistered(true);
+      setPushSync(lastSync());
+    } else {
+      void isRegistered().then(setRegistered);
+    }
     setFeedback(
       result.ok
         ? {

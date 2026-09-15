@@ -28,10 +28,19 @@ export function RootScreen() {
    * survive a suspended tab, which is the usual state of an installed PWA.
    */
   // Keep the server's copy of the reminders current; it is what sends the
-  // pushes that survive the app being closed.
+  // pushes that survive the app being closed. Also re-sync when the app comes
+  // back to the foreground: iOS revokes push subscriptions on its own, and a
+  // stale one means the reminders silently stop arriving.
   useEffect(() => {
     if (store.isLoading) return;
     void syncReminders(store.tasks);
+
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void syncReminders(store.tasks);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [store.tasks, store.isLoading]);
 
   useEffect(() => {
