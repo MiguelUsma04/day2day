@@ -4,6 +4,10 @@
  * Backed by Vercel Blob rather than a database: the payload is one small JSON
  * document per device, and the app has no other server state to justify one.
  *
+ * The store is private — these records hold push endpoints, which must not be
+ * publicly fetchable — so reads go through the SDK's `get` rather than a public
+ * URL.
+ *
  * Each device owns a record keyed by a random id the client keeps locally, so
  * no accounts are needed and one person's reminders never reach another's
  * device. Reminders are stored as "what to send and at which local minute",
@@ -11,7 +15,7 @@
  * without knowing anything about the user.
  */
 
-import { head, list, put, del } from '@vercel/blob';
+import { del, get, list, put } from '@vercel/blob';
 
 const PREFIX = 'push/';
 
@@ -26,7 +30,8 @@ function pathFor(deviceId) {
 
 export async function saveDevice(deviceId, record) {
   await put(pathFor(deviceId), JSON.stringify(record), {
-    access: 'public',
+    // Must match how the store was provisioned; these records are not public.
+    access: 'private',
     contentType: 'application/json',
     // The path is the identity of the record, so keep it stable across writes.
     addRandomSuffix: false,
@@ -34,23 +39,27 @@ export async function saveDevice(deviceId, record) {
   });
 }
 
-export async function loadDevice(deviceId) {
+/** Reads and parses one record, or null when it does not exist. */
+async function readBlob(pathname) {
   try {
-    const meta = await head(pathFor(deviceId));
-    if (!meta?.url) return null;
-    const res = await fetch(meta.url, { cache: 'no-store' });
-    if (!res.ok) return null;
-    return await res.json();
+    // `get` returns { stream, headers, blob }; the body arrives as a stream.
+    const result = await get(pathname, { access: 'private' });
+    if (!result?.stream) return null;
+    const text = await new Response(result.stream).text();
+    return text ? JSON.parse(text) : null;
   } catch {
     // A missing blob throws; treat it as "no record" rather than an error.
     return null;
   }
 }
 
+export async function loadDevice(deviceId) {
+  return readBlob(pathFor(deviceId));
+}
+
 export async function deleteDevice(deviceId) {
   try {
-    const meta = await head(pathFor(deviceId));
-    if (meta?.url) await del(meta.url);
+    await del(pathFor(deviceId));
   } catch {
     // Already gone is success for our purposes.
   }
@@ -63,14 +72,8 @@ export async function listDevices() {
   do {
     const page = await list({ prefix: PREFIX, cursor, limit: 1000 });
     for (const blob of page.blobs) {
-      try {
-        const res = await fetch(blob.url, { cache: 'no-store' });
-        if (!res.ok) continue;
-        const record = await res.json();
-        if (record?.subscription) out.push(record);
-      } catch {
-        // Skip an unreadable record instead of failing the whole run.
-      }
+      const record = await readBlob(blob.pathname);
+      if (record?.subscription) out.push(record);
     }
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor);
