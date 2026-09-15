@@ -41,6 +41,9 @@ function localNow(tzOffsetMinutes) {
 }
 
 function appliesToday(reminder, weekday, dateKey) {
+  // A day edited on its own is sent by its own entry, not by the series.
+  if (Array.isArray(reminder.except) && reminder.except.includes(dateKey)) return false;
+
   switch (reminder.kind) {
     case 'daily':
       return true;

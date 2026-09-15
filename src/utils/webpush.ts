@@ -90,26 +90,84 @@ export function buildReminders(tasks: Task[]) {
     kind: 'daily' | 'weekdays' | 'custom' | 'once';
     days: number[];
     date: string | null;
+    /** Local dates the recurring entry must skip, because they were edited. */
+    except: string[];
   }[] = [];
 
-  for (const task of tasks) {
-    if (task.startMinutes === null || task.reminderMinutes === null) continue;
-
-    const minute = task.startMinutes - task.reminderMinutes;
-    if (minute < 0 || minute >= 24 * 60) continue;
-
+  const add = (
+    id: string,
+    title: string,
+    startMinutes: number,
+    reminderMinutes: number,
+    kind: 'daily' | 'weekdays' | 'custom' | 'once',
+    days: number[],
+    date: string | null,
+    except: string[] = [],
+  ) => {
+    const minute = startMinutes - reminderMinutes;
+    if (minute < 0 || minute >= 24 * 60) return;
     out.push({
-      id: task.id,
-      title: task.title,
+      id,
+      title,
       body:
-        task.reminderMinutes === 0
-          ? `Es hora · ${formatTime(task.startMinutes)}`
-          : `En ${task.reminderMinutes} min · ${formatTime(task.startMinutes)}`,
+        reminderMinutes === 0
+          ? `Es hora · ${formatTime(startMinutes)}`
+          : `En ${reminderMinutes} min · ${formatTime(startMinutes)}`,
       minute,
-      kind: task.repeat.kind === 'none' ? 'once' : task.repeat.kind,
-      days: task.repeat.kind === 'custom' ? task.repeat.days : [],
-      date: task.repeat.kind === 'none' ? task.date : null,
+      kind,
+      days,
+      date,
+      except,
     });
+  };
+
+  for (const task of tasks) {
+    if (task.reminderMinutes === null) continue;
+
+    /**
+     * A day the routine was edited on its own, or skipped, must not use the
+     * series' time. Each override becomes its own one-off entry and the day is
+     * excluded from the recurring one, so an edited occurrence is reminded at
+     * the time the user actually set.
+     */
+    const overriddenDays = new Set<string>();
+
+    for (const [dayKey, override] of Object.entries(task.overrides ?? {})) {
+      const start = override.startMinutes ?? task.startMinutes;
+      if (start === null) continue;
+      overriddenDays.add(dayKey);
+      add(
+        `${task.id}@${dayKey}`,
+        override.title ?? task.title,
+        start,
+        task.reminderMinutes,
+        'once',
+        [],
+        dayKey,
+      );
+    }
+
+    if (task.startMinutes === null) continue;
+
+    if (task.repeat.kind === 'none') {
+      // A one-off already handled by an override should not be sent twice.
+      if (!overriddenDays.has(task.date) && !task.skippedDays.includes(task.date)) {
+        add(task.id, task.title, task.startMinutes, task.reminderMinutes, 'once', [], task.date);
+      }
+      continue;
+    }
+
+    add(
+      task.id,
+      task.title,
+      task.startMinutes,
+      task.reminderMinutes,
+      task.repeat.kind,
+      task.repeat.kind === 'custom' ? task.repeat.days : [],
+      null,
+      // Days handled by an override, plus days the user removed outright.
+      [...overriddenDays, ...task.skippedDays],
+    );
   }
 
   return out;

@@ -30,6 +30,10 @@ function sanitizeReminders(input) {
         : 'once',
       // For one-off reminders, the local date it belongs to.
       date: typeof r?.date === 'string' ? r.date.slice(0, 10) : null,
+      // Dates a recurring reminder must skip, because that day was edited.
+      except: Array.isArray(r?.except)
+        ? r.except.filter((d) => typeof d === 'string').slice(0, 60)
+        : [],
     }))
     .filter(
       (r) =>
