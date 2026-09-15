@@ -72,6 +72,7 @@ export default async function handler(req, res) {
   }
 
   const summary = { devices: 0, sent: 0, skipped: 0, failed: 0, pruned: 0 };
+  const log = [];
 
   try {
     const devices = await listDevices();
@@ -102,10 +103,18 @@ export default async function handler(req, res) {
               tag: `${reminder.id}:${dateKey}`,
               url: '/',
             }),
+            {
+              // Apple and Google hold low-urgency pushes to save battery, which
+              // can delay them by minutes. A reminder is useless late.
+              urgency: 'high',
+              // No point delivering a reminder long after its moment.
+              TTL: 15 * 60,
+            },
           );
           reminder.lastSentDate = dateKey;
           changed = true;
           summary.sent += 1;
+          log.push({ title: reminder.title, at: reminder.minute, now: minute, lateBy: due });
         } catch (error) {
           // 404/410 mean the browser dropped the subscription for good.
           const status = error?.statusCode;
@@ -124,7 +133,9 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({ ok: true, ...summary, at: new Date().toISOString() });
+    return res
+      .status(200)
+      .json({ ok: true, ...summary, log, at: new Date().toISOString() });
   } catch (error) {
     return res
       .status(500)
