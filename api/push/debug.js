@@ -56,11 +56,8 @@ export default async function handler(req, res) {
         weekday: now.weekday,
         totalReminders: reminders.length,
         dueNow,
-        // A window around now, to see what is scheduled nearby.
-        nearby: reminders
-          .filter((rm) => Math.abs(rm.dueIn) <= 90)
-          .sort((a, b) => a.dueIn - b.dueIn)
-          .slice(0, 12),
+        // Everything, so an unexpected time or kind is visible.
+        all: reminders.sort((a, b) => a.at.localeCompare(b.at)),
       });
     } catch (e) {
       out.devices.push({ pathname: blob.pathname, error: String(e?.message ?? e).slice(0, 120) });
