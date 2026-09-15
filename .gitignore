@@ -42,3 +42,4 @@ yarn-error.*
 
 # Web Push signing keys — the private key must never be committed
 .vapid-keys.json
+.env.vercel
