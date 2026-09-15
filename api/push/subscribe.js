@@ -6,7 +6,7 @@
  * data, and a stale server copy would send reminders the user already deleted.
  */
 
-import { isValidDeviceId, saveDevice } from '../_lib/store.js';
+import { isValidDeviceId, loadDevice, saveDevice } from '../_lib/store.js';
 
 /** Bound the payload so a bad client cannot store something unreasonable. */
 const MAX_REMINDERS = 200;
@@ -61,10 +61,29 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'subscription incompleta' });
     }
 
+    /**
+     * Carry over what has already been delivered today.
+     *
+     * The client replaces the whole list on every sync and knows nothing about
+     * `lastSentDate`, so without this a sync would erase the delivery record
+     * and the same reminder would be sent again on the next run.
+     */
+    const previous = await loadDevice(deviceId);
+    const alreadySent = new Map(
+      (previous?.reminders ?? [])
+        .filter((r) => r.lastSentDate)
+        .map((r) => [r.id, r.lastSentDate]),
+    );
+
+    const incoming = sanitizeReminders(reminders).map((r) => {
+      const lastSentDate = alreadySent.get(r.id);
+      return lastSentDate ? { ...r, lastSentDate } : r;
+    });
+
     await saveDevice(deviceId, {
       deviceId,
       subscription,
-      reminders: sanitizeReminders(reminders),
+      reminders: incoming,
       // Sent by the client because the server has no idea where the user is.
       tzOffsetMinutes: Number.isFinite(tzOffsetMinutes) ? Number(tzOffsetMinutes) : 0,
       updatedAt: new Date().toISOString(),

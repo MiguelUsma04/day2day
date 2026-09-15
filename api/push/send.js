@@ -80,7 +80,6 @@ export default async function handler(req, res) {
 
     for (const device of devices) {
       const { minute, weekday, dateKey } = localNow(device.tzOffsetMinutes ?? 0);
-      let changed = false;
 
       for (const reminder of device.reminders ?? []) {
         if (!appliesToday(reminder, weekday, dateKey)) continue;
@@ -112,25 +111,23 @@ export default async function handler(req, res) {
             },
           );
           reminder.lastSentDate = dateKey;
-          changed = true;
           summary.sent += 1;
           log.push({ title: reminder.title, at: reminder.minute, now: minute, lateBy: due });
+          // Record it right away: a slow run must not let the next trigger
+          // read a stale record and send the same reminder twice.
+          await saveDevice(device.deviceId, device);
         } catch (error) {
           // 404/410 mean the browser dropped the subscription for good.
           const status = error?.statusCode;
           if (status === 404 || status === 410) {
             await deleteDevice(device.deviceId);
             summary.pruned += 1;
-            changed = false;
             break;
           }
           summary.failed += 1;
         }
       }
 
-      if (changed) {
-        await saveDevice(device.deviceId, device);
-      }
     }
 
     return res
