@@ -31,6 +31,7 @@ import { isSoundEnabled, playComplete, setSoundEnabled } from '../utils/sound';
 import {
   enablePush,
   getState as getPushState,
+  isRegistered,
   lastSync,
   sendTestPush,
   type PushState,
@@ -122,6 +123,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
   const [armed, setArmed] = useState(0);
   const [pushState, setPushState] = useState<PushState>('unsupported');
   const [pushSync, setPushSync] = useState<{ at: number; count: number } | null>(null);
+  const [registered, setRegistered] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -136,6 +138,27 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
     const id = setInterval(sync, 2000);
     return () => clearInterval(id);
   }, []);
+
+  // Whether the *server* knows this device — the part that actually decides
+  // if a reminder can be delivered.
+  useEffect(() => {
+    if (pushState !== 'subscribed') {
+      setRegistered(null);
+      return;
+    }
+    let active = true;
+    const check = () => {
+      void isRegistered().then((value) => {
+        if (active) setRegistered(value);
+      });
+    };
+    check();
+    const id = setInterval(check, 5000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [pushState, pushSync]);
 
   // How many activities still have a reminder ahead of them today.
   const withReminder = tasks.filter(
@@ -170,7 +193,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
   const handleTestPush = useCallback(async () => {
     void Haptics.selectionAsync();
     setBusy(true);
-    const result = await sendTestPush();
+    const result = await sendTestPush(tasks);
     setBusy(false);
     setFeedback(
       result.ok
@@ -180,7 +203,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
           }
         : { tone: 'error', message: result.error ?? 'No se pudo enviar.' },
     );
-  }, []);
+  }, [tasks]);
 
   const handleImport = useCallback(() => {
     const result = parseImport(importText, toDayKey(new Date()));
@@ -432,15 +455,29 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
           <>
             <View style={[styles.statusRow, { borderColor: colors.border }]}>
               <Ionicons
-                name={withReminder > 0 ? 'checkmark-circle' : 'information-circle-outline'}
+                name={
+                  registered === false
+                    ? 'alert-circle-outline'
+                    : registered && withReminder > 0
+                      ? 'checkmark-circle'
+                      : 'information-circle-outline'
+                }
                 size={16}
-                color={withReminder > 0 ? colors.accent : colors.mutedForeground}
+                color={
+                  registered === false
+                    ? colors.destructive
+                    : registered && withReminder > 0
+                      ? colors.accent
+                      : colors.mutedForeground
+                }
               />
               <Text style={[styles.cardHint, { color: colors.mutedForeground, flex: 1 }]}>
-                {withReminder === 0
-                  ? 'Ninguna actividad tiene aviso configurado. Ábrela y elige cuándo avisarte.'
-                  : `${withReminder} ${withReminder === 1 ? 'actividad avisa' : 'actividades avisan'} a su hora.` +
-                    (pushSync ? ' Sincronizado con el servidor.' : '')}
+                {registered === false
+                  ? 'El servidor todavía no reconoce este dispositivo. Toca "Enviar prueba" para registrarlo.'
+                  : withReminder === 0
+                    ? 'Ninguna actividad tiene aviso configurado. Ábrela y elige cuándo avisarte.'
+                    : `${withReminder} ${withReminder === 1 ? 'actividad avisa' : 'actividades avisan'} a su hora.` +
+                      (registered ? ' Registrado en el servidor.' : '')}
               </Text>
             </View>
 

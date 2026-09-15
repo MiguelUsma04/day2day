@@ -185,6 +185,18 @@ export async function syncReminders(tasks: Task[]): Promise<boolean> {
   }
 }
 
+/** Asks the server whether it currently knows this device. */
+export async function isRegistered(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/push/status?deviceId=' + encodeURIComponent(deviceId()));
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data?.registered === true;
+  } catch {
+    return false;
+  }
+}
+
 export function lastSync(): { at: number; count: number } | null {
   try {
     const raw = localStorage.getItem(SYNC_KEY);
@@ -194,17 +206,56 @@ export function lastSync(): { at: number; count: number } | null {
   }
 }
 
-/** Sends one push immediately, to prove the whole chain works end to end. */
-export async function sendTestPush(): Promise<{ ok: boolean; error?: string }> {
+async function postTest(): Promise<Response | null> {
   try {
-    const res = await fetch('/api/push/test', {
+    return await fetch('/api/push/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId: deviceId() }),
     });
-    const data = await res.json().catch(() => ({}));
-    return res.ok ? { ok: true } : { ok: false, error: data?.error ?? 'Error del servidor' };
-  } catch (error) {
-    return { ok: false, error: String((error as Error)?.message ?? error) };
+  } catch {
+    return null;
   }
+}
+
+/**
+ * Sends one push immediately, to prove the whole chain works end to end.
+ *
+ * If the server does not know this device — an expired subscription, or a build
+ * that predates push — it registers and retries once, so the button repairs the
+ * situation instead of only reporting it.
+ */
+export async function sendTestPush(
+  tasks: Task[] = [],
+): Promise<{ ok: boolean; error?: string }> {
+  if (!supported()) {
+    return { ok: false, error: 'Este navegador no admite avisos.' };
+  }
+  if (Notification.permission !== 'granted') {
+    return { ok: false, error: 'Primero activa el permiso de notificaciones.' };
+  }
+
+  let res = await postTest();
+
+  if (res && (res.status === 404 || res.status === 410)) {
+    const subscription = await getSubscription().catch(() => null);
+    if (!subscription) {
+      return {
+        ok: false,
+        error: 'No se pudo crear la suscripción. Cierra la app del todo, ábrela y reintenta.',
+      };
+    }
+    const uploaded = await upload(subscription, tasks);
+    if (!uploaded) {
+      return { ok: false, error: 'No se pudo registrar el dispositivo en el servidor.' };
+    }
+    res = await postTest();
+  }
+
+  if (!res) return { ok: false, error: 'Sin conexión con el servidor.' };
+
+  const data = await res.json().catch(() => ({}) as { error?: string });
+  return res.ok
+    ? { ok: true }
+    : { ok: false, error: data?.error ?? `Error del servidor (${res.status})` };
 }
