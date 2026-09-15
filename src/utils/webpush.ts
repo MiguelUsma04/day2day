@@ -129,10 +129,36 @@ async function getSubscription(): Promise<PushSubscription | null> {
   });
 }
 
+/** Fire-and-forget upload that survives the page being closed. */
+export function uploadBeacon(tasks: Task[]): boolean {
+  if (!supported() || Notification.permission !== 'granted') return false;
+  if (typeof navigator.sendBeacon !== 'function') return false;
+  try {
+    const cached = cachedSubscription;
+    if (!cached) return false;
+    const payload = JSON.stringify({
+      deviceId: deviceId(),
+      subscription: cached,
+      reminders: buildReminders(tasks),
+      tzOffsetMinutes: new Date().getTimezoneOffset(),
+    });
+    return navigator.sendBeacon(
+      '/api/push/subscribe',
+      new Blob([payload], { type: 'application/json' }),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Last subscription seen, so a beacon can be sent without awaiting anything. */
+let cachedSubscription: PushSubscriptionJSON | null = null;
+
 async function upload(subscription: PushSubscription, tasks: Task[]): Promise<boolean> {
+  cachedSubscription = subscription.toJSON();
   const payload = {
     deviceId: deviceId(),
-    subscription: subscription.toJSON(),
+    subscription: cachedSubscription,
     reminders: buildReminders(tasks),
     // The server has no idea what timezone the device is in.
     tzOffsetMinutes: new Date().getTimezoneOffset(),
@@ -187,17 +213,26 @@ export async function syncReminders(tasks: Task[]): Promise<boolean> {
 
 /** Asks the server whether it currently knows this device. */
 export async function isRegistered(): Promise<boolean> {
+  const status = await serverStatus();
+  return status?.registered === true;
+}
+
+/** What the server currently holds for this device. */
+export async function serverStatus(): Promise<{
+  registered: boolean;
+  reminders: number;
+  updatedAt: string | null;
+} | null> {
   try {
     // Must bypass the cache: the service worker would otherwise keep serving
-    // the stale "not registered" answer from before the device was stored.
+    // the stale answer from before the device was stored.
     const res = await fetch('/api/push/status?deviceId=' + encodeURIComponent(deviceId()), {
       cache: 'no-store',
     });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data?.registered === true;
+    if (!res.ok) return null;
+    return await res.json();
   } catch {
-    return false;
+    return null;
   }
 }
 

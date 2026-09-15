@@ -34,6 +34,8 @@ import {
   getState as getPushState,
   isRegistered,
   lastSync,
+  serverStatus,
+  syncReminders,
   sendTestPush,
   type PushState,
 } from '../utils/webpush';
@@ -125,6 +127,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
   const [pushState, setPushState] = useState<PushState>('unsupported');
   const [pushSync, setPushSync] = useState<{ at: number; count: number } | null>(null);
   const [registered, setRegistered] = useState<boolean | null>(null);
+  const [serverCount, setServerCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -149,8 +152,10 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
     }
     let active = true;
     const check = () => {
-      void isRegistered().then((value) => {
-        if (active) setRegistered(value);
+      void serverStatus().then((value) => {
+        if (!active) return;
+        setRegistered(value?.registered === true);
+        setServerCount(value?.reminders ?? null);
       });
     };
     check();
@@ -494,10 +499,39 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
                   ? 'El servidor todavía no reconoce este dispositivo. Toca "Enviar prueba" para registrarlo.'
                   : withReminder === 0
                     ? 'Ninguna actividad tiene aviso configurado. Ábrela y elige cuándo avisarte.'
-                    : `${withReminder} ${withReminder === 1 ? 'actividad avisa' : 'actividades avisan'} a su hora.` +
-                      (registered ? ' Registrado en el servidor.' : '')}
+                    : serverCount !== null && serverCount !== withReminder
+                      ? `El servidor tiene ${serverCount} de tus ${withReminder} avisos. Toca "Sincronizar ahora".`
+                      : `${withReminder} ${withReminder === 1 ? 'actividad avisa' : 'actividades avisan'} a su hora, y el servidor ya las tiene.`}
               </Text>
             </View>
+
+            <Pressable
+              onPress={async () => {
+                void Haptics.selectionAsync();
+                setBusy(true);
+                const ok = await syncReminders(tasks);
+                const status = await serverStatus();
+                setServerCount(status?.reminders ?? null);
+                setBusy(false);
+                setFeedback(
+                  ok
+                    ? { tone: 'ok', message: `Sincronizado: el servidor tiene ${status?.reminders ?? 0} avisos.` }
+                    : { tone: 'error', message: 'No se pudo sincronizar.' },
+                );
+              }}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy }}
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                { borderColor: colors.border, opacity: busy ? 0.5 : pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Ionicons name="sync-outline" size={16} color={colors.foreground} />
+              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                Sincronizar ahora
+              </Text>
+            </Pressable>
 
             <Pressable
               onPress={handleTestPush}

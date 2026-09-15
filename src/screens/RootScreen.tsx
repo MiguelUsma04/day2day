@@ -6,7 +6,7 @@ import { useTasks } from '../storage/useTasks';
 import { useTheme } from '../theme/ThemeProvider';
 import { toDayKey } from '../utils/date';
 import { scheduleReminders } from '../utils/notifications';
-import { syncReminders } from '../utils/webpush';
+import { syncReminders, uploadBeacon } from '../utils/webpush';
 import { ReportScreen } from './ReportScreen';
 import { ScheduleScreen } from './ScheduleScreen';
 import { SettingsScreen } from './SettingsScreen';
@@ -37,9 +37,16 @@ export function RootScreen() {
 
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void syncReminders(store.tasks);
+      if (document.visibilityState === 'visible') {
+        void syncReminders(store.tasks);
+      } else {
+        // Leaving the app cancels a pending fetch, so an edit made just before
+        // closing would never reach the server. A beacon survives teardown.
+        uploadBeacon(store.tasks);
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pagehide', () => uploadBeacon(store.tasks));
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [store.tasks, store.isLoading]);
 
