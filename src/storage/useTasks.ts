@@ -8,9 +8,15 @@ function createId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Scheduled entries sort by start time; unscheduled ones trail in creation order. */
+/**
+ * Scheduled entries sort by start time; unscheduled ones trail in creation order.
+ *
+ * Completed entries drop below the pending ones, so what is left to do stays at
+ * the top of the day instead of being buried under what is already done.
+ */
 function sortInstances(items: TaskInstance[]): TaskInstance[] {
   return [...items].sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
     if (a.startMinutes === null && b.startMinutes === null) return a.createdAt - b.createdAt;
     if (a.startMinutes === null) return 1;
     if (b.startMinutes === null) return -1;
@@ -184,6 +190,12 @@ export function useTasks() {
     ]);
   }, []);
 
+  const updateTodo = useCallback((id: string, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, title: trimmed } : t)));
+  }, []);
+
   const toggleTodo = useCallback((id: string) => {
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
   }, []);
@@ -215,7 +227,10 @@ export function useTasks() {
 
   const getTodosForDay = useCallback(
     (dayKey: string) =>
-      todos.filter((t) => t.date === dayKey).sort((a, b) => a.createdAt - b.createdAt),
+      todos
+        .filter((t) => t.date === dayKey)
+        // Done items sink, matching how the schedule orders itself.
+        .sort((a, b) => (a.done !== b.done ? (a.done ? 1 : -1) : a.createdAt - b.createdAt)),
     [todos],
   );
 
@@ -234,6 +249,7 @@ export function useTasks() {
     getTasksForDay,
     markedDays,
     addTodo,
+    updateTodo,
     toggleTodo,
     deleteTodo,
     getTodosForDay,

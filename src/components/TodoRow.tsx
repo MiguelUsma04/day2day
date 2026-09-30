@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -13,10 +13,38 @@ type Props = {
   todo: Todo;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
 };
 
-export function TodoRow({ todo, onToggle, onDelete }: Props) {
+export function TodoRow({ todo, onToggle, onDelete, onRename }: Props) {
   const { colors, isDark } = useTheme();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(todo.title);
+  const inputRef = useRef<TextInput>(null);
+
+  // Follow external changes while not mid-edit, so a sync cannot clobber typing.
+  useEffect(() => {
+    if (!editing) setDraft(todo.title);
+  }, [todo.title, editing]);
+
+  const startEdit = useCallback(() => {
+    void Haptics.selectionAsync();
+    setDraft(todo.title);
+    setEditing(true);
+    // Focus after the input mounts.
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [todo.title]);
+
+  const commit = useCallback(() => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    // An empty title would leave an unreadable row; keep the previous one.
+    if (!trimmed || trimmed === todo.title) {
+      setDraft(todo.title);
+      return;
+    }
+    onRename(todo.id, trimmed);
+  }, [draft, todo.id, todo.title, onRename]);
 
   const toggle = useCallback(() => {
     if (todo.done) playUndo();
@@ -58,20 +86,40 @@ export function TodoRow({ todo, onToggle, onDelete }: Props) {
         {todo.done ? <Ionicons name="checkmark" size={15} color={colors.onPrimary} /> : null}
       </Pressable>
 
-      <Pressable onPress={toggle} style={styles.labelTap} accessibilityRole="button">
-        <Text
-          numberOfLines={2}
-          style={[
-            styles.label,
-            {
-              color: todo.done ? colors.mutedForeground : colors.foreground,
-              textDecorationLine: todo.done ? 'line-through' : 'none',
-            },
-          ]}
+      {editing ? (
+        <TextInput
+          ref={inputRef}
+          value={draft}
+          onChangeText={setDraft}
+          onBlur={commit}
+          onSubmitEditing={commit}
+          returnKeyType="done"
+          selectTextOnFocus
+          accessibilityLabel="Editar pendiente"
+          style={[styles.input, { color: colors.foreground, borderColor: colors.primary }]}
+        />
+      ) : (
+        <Pressable
+          onPress={startEdit}
+          style={styles.labelTap}
+          accessibilityRole="button"
+          accessibilityLabel={`Editar ${todo.title}`}
+          accessibilityHint="Toca para cambiar el texto"
         >
-          {todo.title}
-        </Text>
-      </Pressable>
+          <Text
+            numberOfLines={2}
+            style={[
+              styles.label,
+              {
+                color: todo.done ? colors.mutedForeground : colors.foreground,
+                textDecorationLine: todo.done ? 'line-through' : 'none',
+              },
+            ]}
+          >
+            {todo.title}
+          </Text>
+        </Pressable>
+      )}
 
       <Pressable
         onPress={requestRemove}
@@ -105,6 +153,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   labelTap: { flex: 1, justifyContent: 'center', minHeight: TOUCH_TARGET },
+  input: {
+    flex: 1,
+    minHeight: TOUCH_TARGET,
+    borderBottomWidth: 2,
+    paddingVertical: spacing.xs,
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.footnote,
+  },
   label: { fontFamily: fontFamily.medium, fontSize: fontSize.footnote, lineHeight: 20 },
   deleteBtn: {
     width: 32,

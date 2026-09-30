@@ -117,6 +117,7 @@ export function RootScreen() {
             onAdd={store.addTodo}
             onToggle={store.toggleTodo}
             onDelete={store.deleteTodo}
+            onRename={store.updateTodo}
           />
         ) : null}
 

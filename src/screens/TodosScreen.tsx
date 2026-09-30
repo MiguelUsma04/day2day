@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Pressable,
   StyleSheet,
@@ -33,6 +34,7 @@ type Props = {
   onAdd: (title: string, date: string) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
 };
 
 export function TodosScreen({
@@ -43,6 +45,7 @@ export function TodosScreen({
   onAdd,
   onToggle,
   onDelete,
+  onRename,
 }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -59,6 +62,21 @@ export function TodosScreen({
     onAdd(value, dayKey);
     setDraft('');
   }, [draft, dayKey, onAdd]);
+
+  const handleToggle = useCallback(
+    (id: string) => {
+      // Ticking an item sends it to the bottom; animate the move.
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          260,
+          LayoutAnimation.Types.easeInEaseOut,
+          LayoutAnimation.Properties.opacity,
+        ),
+      );
+      onToggle(id);
+    },
+    [onToggle],
+  );
 
   const confirmRemoval = useCallback(() => {
     if (!confirmDelete) return;
@@ -95,7 +113,12 @@ export function TodosScreen({
         data={todos}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TodoRow todo={item} onToggle={onToggle} onDelete={() => setConfirmDelete(item)} />
+          <TodoRow
+            todo={item}
+            onToggle={handleToggle}
+            onDelete={() => setConfirmDelete(item)}
+            onRename={onRename}
+          />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: spacing.xl }]}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, LayoutAnimation, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,6 +54,20 @@ export function ScheduleScreen({
   const [pending, setPending] = useState<PendingScope | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<TaskInstance | null>(null);
   const [nowMinutes, setNowMinutes] = useState(() => minutesSinceMidnight(new Date()));
+
+  /**
+   * Completing something moves it to the bottom of the list. Animate that move
+   * so the row is seen travelling instead of vanishing and reappearing.
+   */
+  const handleToggle = useCallback(
+    (id: string, day: string) => {
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(260, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity),
+      );
+      onToggle(id, day);
+    },
+    [onToggle],
+  );
 
   // Keep the "Ahora" marker fresh without re-rendering every second.
   useEffect(() => {
@@ -205,7 +219,7 @@ export function ScheduleScreen({
         renderItem={({ item }) => (
           <TaskCard
             task={item}
-            onToggle={onToggle}
+            onToggle={handleToggle}
             onPress={openEdit}
             onDelete={handleDeleteRequest}
             isCurrent={item.id === currentTaskId}
