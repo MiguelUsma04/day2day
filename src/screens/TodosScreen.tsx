@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -23,7 +23,7 @@ import { shadow } from '../theme/shadows';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import type { Todo } from '../types/task';
-import { friendlyDate, toDayKey } from '../utils/date';
+import { addDays, friendlyDate, toDayKey } from '../utils/date';
 import { playDelete } from '../utils/sound';
 
 type Props = {
@@ -35,6 +35,7 @@ type Props = {
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  onMove: (id: string, deltaDays: number) => void;
 };
 
 export function TodosScreen({
@@ -46,11 +47,13 @@ export function TodosScreen({
   onToggle,
   onDelete,
   onRename,
+  onMove,
 }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null);
+  const [movedNote, setMovedNote] = useState<string | null>(null);
 
   const dayKey = toDayKey(selectedDate);
   const doneCount = todos.filter((t) => t.done).length;
@@ -77,6 +80,38 @@ export function TodosScreen({
     },
     [onToggle],
   );
+
+  /**
+   * Moving an item makes it leave the day on screen, so say where it went:
+   * otherwise the row just disappears with no explanation.
+   */
+  const handleMove = useCallback(
+    (id: string, deltaDays: number) => {
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          240,
+          LayoutAnimation.Types.easeInEaseOut,
+          LayoutAnimation.Properties.opacity,
+        ),
+      );
+      onMove(id, deltaDays);
+      setMovedNote(
+        `Movido a ${friendlyDate(addDays(selectedDate, deltaDays)).toLowerCase()}`,
+      );
+    },
+    [onMove, selectedDate],
+  );
+
+  // Clear the note on its own, and whenever the day changes.
+  useEffect(() => {
+    if (!movedNote) return;
+    const id = setTimeout(() => setMovedNote(null), 2600);
+    return () => clearTimeout(id);
+  }, [movedNote]);
+
+  useEffect(() => {
+    setMovedNote(null);
+  }, [dayKey]);
 
   const confirmRemoval = useCallback(() => {
     if (!confirmDelete) return;
@@ -118,6 +153,7 @@ export function TodosScreen({
             onToggle={handleToggle}
             onDelete={() => setConfirmDelete(item)}
             onRename={onRename}
+            onMove={handleMove}
           />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: spacing.xl }]}
@@ -131,6 +167,18 @@ export function TodosScreen({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       />
+
+      {movedNote ? (
+        <View
+          style={[
+            styles.movedNote,
+            { backgroundColor: colors.muted, borderColor: colors.border },
+          ]}
+        >
+          <Ionicons name="arrow-redo-outline" size={15} color={colors.primary} />
+          <Text style={[styles.movedText, { color: colors.foreground }]}>{movedNote}</Text>
+        </View>
+      ) : null}
 
       <ConfirmDialog
         visible={confirmDelete !== null}
@@ -204,6 +252,18 @@ const styles = StyleSheet.create({
   },
   listBox: { flex: 1 },
   list: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, flexGrow: 1 },
+  movedNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  movedText: { fontFamily: fontFamily.medium, fontSize: fontSize.label },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',

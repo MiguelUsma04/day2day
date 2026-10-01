@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { EditScope, Task, TaskDraft, TaskInstance, Todo } from '../types/task';
+import { addDays, fromDayKey, toDayKey } from '../utils/date';
 import { occursOn } from './occurrence';
 import { loadTasks, loadTodos, saveTasks, saveTodos } from './tasks';
 
@@ -196,6 +197,15 @@ export function useTasks() {
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, title: trimmed } : t)));
   }, []);
 
+  /** Moves an item by whole days, keeping its position in the new day's list. */
+  const moveTodo = useCallback((id: string, deltaDays: number) => {
+    setTodos((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, date: toDayKey(addDays(fromDayKey(t.date), deltaDays)) } : t,
+      ),
+    );
+  }, []);
+
   const toggleTodo = useCallback((id: string) => {
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
   }, []);
@@ -250,6 +260,7 @@ export function useTasks() {
     markedDays,
     addTodo,
     updateTodo,
+    moveTodo,
     toggleTodo,
     deleteTodo,
     getTodosForDay,
