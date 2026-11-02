@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { Ionicons } from '../theme/Ionicons';
+import * as Haptics from '../utils/haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { categoryMeta, categoryTint } from '../theme/categories';
@@ -321,7 +321,7 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
 
 const styles = StyleSheet.create({
   container: { borderRadius: radius.lg, overflow: 'hidden' },
-  actions: { ...StyleSheet.absoluteFill, flexDirection: 'row' },
+  actions: { ...StyleSheet.absoluteFillObject, flexDirection: 'row' },
   action: {
     flex: 1,
     flexDirection: 'row',

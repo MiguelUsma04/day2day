@@ -1,7 +1,9 @@
 import { Platform } from 'react-native';
 
+import { functionHeaders, functionsUrl } from '../lib/supabase';
+import { resolveDayMode, taskFitsMode, type DayModeMap } from '../storage/dayModes';
 import type { Task } from '../types/task';
-import { formatTime } from './date';
+import { addDays, formatTime, toDayKey } from './date';
 
 /**
  * Web Push: reminders delivered by the server, so they arrive with the app
@@ -12,7 +14,16 @@ import { formatTime } from './date';
  * about; a scheduled job on the server decides what is due and sends it. No
  * accounts: each device keeps a random id locally and only ever sees its own
  * reminders.
+ *
+ * The server is the `push` Supabase Edge Function (supabase/functions/push),
+ * driven every minute by pg_cron. Without Supabase configured, push is
+ * reported as unsupported.
  */
+
+/** Endpoint of one route of the push function, or null when Supabase is not configured. */
+function endpoint(route: 'subscribe' | 'status' | 'test'): string | null {
+  return functionsUrl ? `${functionsUrl}/push/${route}` : null;
+}
 
 const DEVICE_KEY = 'day2day:deviceId:v1';
 const SYNC_KEY = 'day2day:pushSync:v1';
@@ -39,6 +50,7 @@ export function isStandalone(): boolean {
 function supported(): boolean {
   return (
     hasWindow() &&
+    functionsUrl !== null &&
     'Notification' in window &&
     'serviceWorker' in navigator &&
     'PushManager' in window
@@ -80,8 +92,27 @@ export function getState(): PushState {
   return 'default';
 }
 
+/** How far ahead day modes are resolved into concrete dates for the server. */
+const HORIZON_DAYS = 90;
+
+/**
+ * Upcoming days, split by what each one would show, so a recurring reminder
+ * can skip holidays and farm days, and a farm routine can be sent as the
+ * handful of dates it actually applies to.
+ */
+function upcomingDays(dayModes?: DayModeMap) {
+  const today = new Date();
+  const days: { key: string; mode: ReturnType<typeof resolveDayMode> }[] = [];
+  for (let i = 0; i < HORIZON_DAYS; i += 1) {
+    const key = toDayKey(addDays(today, i));
+    days.push({ key, mode: resolveDayMode(dayModes, key) });
+  }
+  return days;
+}
+
 /** The reminders this device wants, flattened for the server. */
-export function buildReminders(tasks: Task[]) {
+export function buildReminders(tasks: Task[], dayModes?: DayModeMap) {
+  const horizon = upcomingDays(dayModes);
   const out: {
     id: string;
     title: string;
@@ -150,12 +181,53 @@ export function buildReminders(tasks: Task[]) {
     if (task.startMinutes === null) continue;
 
     if (task.repeat.kind === 'none') {
-      // A one-off already handled by an override should not be sent twice.
-      if (!overriddenDays.has(task.date) && !task.skippedDays.includes(task.date)) {
+      // A one-off already handled by an override should not be sent twice,
+      // and one on a day that hides it (holiday, wrong context) not at all.
+      if (
+        !overriddenDays.has(task.date) &&
+        !task.skippedDays.includes(task.date) &&
+        taskFitsMode(task, resolveDayMode(dayModes, task.date))
+      ) {
         add(task.id, task.title, task.startMinutes, task.reminderMinutes, 'once', [], task.date);
       }
       continue;
     }
+
+    /**
+     * The server only knows weekdays, not how a day is spent. Farm routines
+     * apply to a few explicitly marked dates, so they go up as one-offs; the
+     * rest go up as the series, minus the upcoming dates that would hide them.
+     */
+    const matchesWeekday = (key: string) => {
+      const weekday = new Date(`${key}T00:00:00`).getDay();
+      return task.repeat.kind === 'daily'
+        ? true
+        : task.repeat.kind === 'weekdays'
+          ? weekday >= 1 && weekday <= 5
+          : task.repeat.days.includes(weekday as (typeof task.repeat.days)[number]);
+    };
+
+    if (task.context === 'farm') {
+      for (const day of horizon) {
+        if (day.mode !== 'farm' || day.key < task.date) continue;
+        if (!matchesWeekday(day.key)) continue;
+        if (overriddenDays.has(day.key) || task.skippedDays.includes(day.key)) continue;
+        add(
+          `${task.id}@${day.key}`,
+          task.title,
+          task.startMinutes,
+          task.reminderMinutes,
+          'once',
+          [],
+          day.key,
+        );
+      }
+      continue;
+    }
+
+    const hiddenDays = horizon
+      .filter((day) => !taskFitsMode(task, day.mode))
+      .map((day) => day.key);
 
     add(
       task.id,
@@ -165,8 +237,9 @@ export function buildReminders(tasks: Task[]) {
       task.repeat.kind,
       task.repeat.kind === 'custom' ? task.repeat.days : [],
       null,
-      // Days handled by an override, plus days the user removed outright.
-      [...overriddenDays, ...task.skippedDays],
+      // Days handled by an override, days the user removed outright, and days
+      // whose mode hides this routine.
+      [...new Set([...overriddenDays, ...task.skippedDays, ...hiddenDays])],
     );
   }
 
@@ -178,7 +251,7 @@ async function getSubscription(): Promise<PushSubscription | null> {
   const existing = await reg.pushManager.getSubscription();
   if (existing) return existing;
 
-  const key = process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY;
+  const key = import.meta.env.VITE_VAPID_PUBLIC_KEY;
   if (!key) return null;
 
   return reg.pushManager.subscribe({
@@ -187,23 +260,32 @@ async function getSubscription(): Promise<PushSubscription | null> {
   });
 }
 
-/** Fire-and-forget upload that survives the page being closed. */
-export function uploadBeacon(tasks: Task[]): boolean {
+/**
+ * Fire-and-forget upload that survives the page being closed.
+ *
+ * `keepalive` lets the request outlive the page, like a beacon, while still
+ * carrying the headers the function needs; `sendBeacon` cannot set any.
+ */
+export function uploadBeacon(tasks: Task[], dayModes?: DayModeMap): boolean {
   if (!supported() || Notification.permission !== 'granted') return false;
-  if (typeof navigator.sendBeacon !== 'function') return false;
+  const url = endpoint('subscribe');
+  if (!url) return false;
   try {
     const cached = cachedSubscription;
     if (!cached) return false;
     const payload = JSON.stringify({
       deviceId: deviceId(),
       subscription: cached,
-      reminders: buildReminders(tasks),
+      reminders: buildReminders(tasks, dayModes),
       tzOffsetMinutes: new Date().getTimezoneOffset(),
     });
-    return navigator.sendBeacon(
-      '/api/push/subscribe',
-      new Blob([payload], { type: 'application/json' }),
-    );
+    void fetch(url, {
+      method: 'POST',
+      headers: { ...functionHeaders, 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
+    return true;
   } catch {
     return false;
   }
@@ -212,20 +294,26 @@ export function uploadBeacon(tasks: Task[]): boolean {
 /** Last subscription seen, so a beacon can be sent without awaiting anything. */
 let cachedSubscription: PushSubscriptionJSON | null = null;
 
-async function upload(subscription: PushSubscription, tasks: Task[]): Promise<boolean> {
+async function upload(
+  subscription: PushSubscription,
+  tasks: Task[],
+  dayModes?: DayModeMap,
+): Promise<boolean> {
   cachedSubscription = subscription.toJSON();
   const payload = {
     deviceId: deviceId(),
     subscription: cachedSubscription,
-    reminders: buildReminders(tasks),
+    reminders: buildReminders(tasks, dayModes),
     // The server has no idea what timezone the device is in.
     tzOffsetMinutes: new Date().getTimezoneOffset(),
   };
 
+  const url = endpoint('subscribe');
+  if (!url) return false;
   try {
-    const res = await fetch('/api/push/subscribe', {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...functionHeaders, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     if (!res.ok) return false;
@@ -237,7 +325,7 @@ async function upload(subscription: PushSubscription, tasks: Task[]): Promise<bo
 }
 
 /** Asks for permission and registers the device. Must run from a user gesture. */
-export async function enablePush(tasks: Task[]): Promise<PushState> {
+export async function enablePush(tasks: Task[], dayModes?: DayModeMap): Promise<PushState> {
   if (!supported()) return 'unsupported';
   if (getState() === 'needs-install') return 'needs-install';
 
@@ -247,7 +335,7 @@ export async function enablePush(tasks: Task[]): Promise<PushState> {
   const subscription = await getSubscription();
   if (!subscription) return 'default';
 
-  await upload(subscription, tasks);
+  await upload(subscription, tasks, dayModes);
   return 'subscribed';
 }
 
@@ -258,12 +346,12 @@ export async function enablePush(tasks: Task[]): Promise<PushState> {
  * an OS update — so this re-reads the subscription rather than trusting a
  * cached one, and quietly does nothing when there is no permission yet.
  */
-export async function syncReminders(tasks: Task[]): Promise<boolean> {
+export async function syncReminders(tasks: Task[], dayModes?: DayModeMap): Promise<boolean> {
   if (!supported() || Notification.permission !== 'granted') return false;
   try {
     const subscription = await getSubscription();
     if (!subscription) return false;
-    return await upload(subscription, tasks);
+    return await upload(subscription, tasks, dayModes);
   } catch {
     return false;
   }
@@ -284,7 +372,10 @@ export async function serverStatus(): Promise<{
   try {
     // Must bypass the cache: the service worker would otherwise keep serving
     // the stale answer from before the device was stored.
-    const res = await fetch('/api/push/status?deviceId=' + encodeURIComponent(deviceId()), {
+    const url = endpoint('status');
+    if (!url) return null;
+    const res = await fetch(`${url}?deviceId=${encodeURIComponent(deviceId())}`, {
+      headers: functionHeaders,
       cache: 'no-store',
     });
     if (!res.ok) return null;
@@ -305,9 +396,11 @@ export function lastSync(): { at: number; count: number } | null {
 
 async function postTest(): Promise<Response | null> {
   try {
-    return await fetch('/api/push/test', {
+    const url = endpoint('test');
+    if (!url) return null;
+    return await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...functionHeaders, 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId: deviceId() }),
     });
   } catch {
@@ -324,6 +417,7 @@ async function postTest(): Promise<Response | null> {
  */
 export async function sendTestPush(
   tasks: Task[] = [],
+  dayModes?: DayModeMap,
 ): Promise<{ ok: boolean; error?: string }> {
   if (!supported()) {
     return { ok: false, error: 'Este navegador no admite avisos.' };
@@ -342,7 +436,7 @@ export async function sendTestPush(
         error: 'No se pudo crear la suscripción. Cierra la app del todo, ábrela y reintenta.',
       };
     }
-    const uploaded = await upload(subscription, tasks);
+    const uploaded = await upload(subscription, tasks, dayModes);
     if (!uploaded) {
       return { ok: false, error: 'No se pudo registrar el dispositivo en el servidor.' };
     }

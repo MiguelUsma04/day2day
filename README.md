@@ -2,13 +2,15 @@
 
 App de cronograma diario para móvil. Arma tu rutina — desde que te levantas hasta que te duermes — y márcala a medida que avanzas.
 
-Hecha con Expo (React Native) y desplegable como PWA instalable en el iPhone.
+PWA web pura: React + react-native-web empaquetados con Vite, instalable en el iPhone desde Safari. No hay build nativo.
 
 ## Qué hace
 
 - **Cronograma por día** con línea de tiempo, hora exacta al minuto y duración.
 - **Rutinas que se repiten**: cada día, de lunes a viernes, o días específicos. Se definen una vez y aparecen solas en cada día que corresponda. Al editarlas se pregunta si el cambio va a ese día o a toda la serie.
 - **Deslizar para actuar**: a la derecha completa (con sonido), a la izquierda elimina pidiendo confirmación.
+- **Fin de semana de ciudad o de finca**: cada sábado y domingo tiene un selector. Las actividades marcadas como *Finca* solo aparecen en días de finca; las de *Ciudad* entre semana y en fines de semana de ciudad; las de *Cualquier día* siempre. Así conviven dos rutinas sin mezclarse.
+- **Festivos**: de lunes a viernes se puede marcar el día como festivo. Ese día no muestra actividades y la racha sigue intacta.
 - **Lista de pendientes** aparte del cronograma, para lo que no tiene hora fija; se editan tocando su texto y se mueven de día deslizándolos a los lados.
 - **Lo completado baja al final** de la lista, así lo que falta queda arriba.
 - **Recordatorios** por Web Push, que llegan con la app cerrada; a la hora de inicio por defecto y configurables por actividad.
@@ -18,7 +20,7 @@ Hecha con Expo (React Native) y desplegable como PWA instalable en el iPhone.
 - **Reporte de constancia**: porcentaje cumplido, rachas, días perfectos, calendario de los últimos días y qué hábitos se te dan mejor o peor.
 - **Seis temas de color** (azul, rosa, lila, ámbar, verde, coral) que tiñen toda la interfaz —fondo, tarjetas y bordes incluidos—, más modo claro/oscuro/automático.
 - **Progreso diario** y marcador **"Ahora"** sobre la actividad en curso.
-- **Todo local**: los datos se guardan en el dispositivo. No hay cuentas ni servidor.
+- **Dos cuentas, cerradas**: Miguel y Karen. Se entra tocando el nombre y escribiendo el código que llega al correo; no hay registro abierto ni contraseñas. Con sesión, los datos se sincronizan con Supabase y aparecen en cualquier dispositivo; lo que ya tenías en el teléfono se sube solo la primera vez. Sin sesión la app sigue funcionando en local.
 
 ## Formato de importación
 
@@ -61,85 +63,136 @@ Se acepta una lista directa, o un objeto con la propiedad `tasks`:
 | `repeat` | no | `none`, `daily`, `weekdays`, `custom`. Por defecto `none` |
 | `days` | solo con `custom` | `["lun","mar","mie","jue","vie","sab","dom"]` o números `0`-`6` (0 = domingo) |
 | `reminder` | no | Minutos de antelación del aviso. Sin él, avisa a la hora de inicio; usa `null` para no avisar |
+| `context` | no | `any`/`cualquiera`, `city`/`ciudad`, `farm`/`finca`. Sin él, se usa lo elegido en *Estas actividades son de* al importar |
 | `notes` | no | Texto |
 | `date` | no | `"YYYY-MM-DD"`, solo para actividades sin repetición. Por defecto, hoy |
 
 Lo que no se pueda leer se avisa al importar, sin bloquear el resto.
 
+### Dos rutinas: ciudad y finca
+
+Lo más simple es tener dos JSON e importarlos uno tras otro **sin** activar *Reemplazar lo existente*:
+
+1. El de lunes a domingo, con *Estas actividades son de* → **Ciudad**. Las de lunes a viernes salen siempre; las de sábado y domingo solo cuando ese fin de semana está en ciudad.
+2. El de fin de semana de finca, con *Estas actividades son de* → **Finca**. Solo salen los sábados y domingos que marques como finca.
+
+Si una actividad debe salir en los dos casos (por ejemplo "Despertar"), ponle `"context": "any"` en el JSON o edítala y elige *Cualquier día*.
+
+Cada sábado y domingo se marca desde el cronograma, en el selector bajo la tira de días. Por defecto todos son de ciudad; solo se guardan las excepciones. Los avisos push respetan la marca: una rutina de finca solo se programa para los días marcados.
+
 ### Para pedírselo a un asistente
 
 > Genera un JSON con mi cronograma diario siguiendo este formato: una lista en la propiedad `tasks`, donde cada entrada tiene `title`, `time` en formato `"HH:MM"` de 24 horas, `duration` en minutos, `category` (`work`, `personal`, `health`, `study` u `other`), `icon` (nombre de Ionicons), `repeat` (`none`, `daily`, `weekdays` o `custom`), y `days` solo si es `custom`. Añade `reminder` con los minutos de antelación donde quiera un aviso.
 
+## Cuenta y sincronización
+
+La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la base de datos es la copia compartida. Iniciar sesión es opcional.
+
+- **Entrar**: Ajustes → Cuenta → tocar *Miguel* o *Karen* → código de 6 dígitos. Sin contraseña ni enlaces: en iPhone un enlace mágico abriría Safari y no la app instalada.
+- **Solo esas cuentas**: el registro está cerrado (`shouldCreateUser: false` y *Allow new users to sign up* apagado en Supabase). Los nombres y correos salen de `VITE_ACCOUNTS`; si no está definida, la app muestra un campo de correo normal.
+- **Qué se sincroniza**: actividades (con historial, overrides y días saltados), pendientes y los días marcados como finca o festivo. Los ajustes de tema y sonido son por dispositivo.
+- **Cómo**: cada cambio local entra en una cola persistida (`day2day:syncQueue:v1`) y se sube con un pequeño retraso; al abrir la app, al volver a primer plano y al recuperar la red se hace un *pull* incremental por `synced_at` (reloj del servidor). En un conflicto gana el `updatedAt` más reciente; un borrado gana a una edición anterior. Los borrados son lógicos (`deleted_at`) para que lleguen a los demás dispositivos.
+- **Primer inicio de sesión**: lo que solo existe en el dispositivo se sube; lo que solo existe en la cuenta se baja.
+- **Cerrar sesión** no borra nada: el dispositivo conserva su copia.
+
+### Puesta en marcha de Supabase
+
+1. Crea un proyecto en [supabase.com](https://supabase.com).
+2. **SQL Editor** → pega y ejecuta `supabase/migrations/20261101000000_init.sql`. Crea `tasks`, `todos` y `push_devices` con RLS.
+3. **Authentication → Sign In / Providers**: *Email* activo; apaga **Allow new users to sign up** para que nadie más pueda crear cuenta.
+4. **Authentication → Users → Add user → Create new user**: una para Miguel y otra para Karen, con su correo real, cualquier contraseña (no se usa) y **Auto Confirm User** marcado. Repite para la segunda.
+5. **Authentication → Email Templates → Magic Link**: la app pide un **código**, no un enlace, así que el cuerpo del correo debe incluir `{{ .Token }}`. Por ejemplo:
+
+   ```html
+   <h2>Tu código para entrar a day2day</h2>
+   <p style="font-size:28px;letter-spacing:4px"><strong>{{ .Token }}</strong></p>
+   <p>Vence en una hora. Si no lo pediste, ignora este correo.</p>
+   ```
+
+6. **Variables de entorno** (ver `.env.example`):
+
+   | Dónde | Variable | Valor |
+   |---|---|---|
+   | `.env.local` y Vercel | `VITE_SUPABASE_URL` | Project Settings → API → Project URL |
+   | `.env.local` y Vercel | `VITE_SUPABASE_ANON_KEY` | Project Settings → API → anon public |
+   | `.env.local` y Vercel | `VITE_ACCOUNTS` | `Miguel:correo1,Karen:correo2` (los mismos correos del paso 4) |
+
+   Sin las dos `VITE_SUPABASE_*` la sección *Cuenta* no aparece y la app funciona solo en local, como antes.
+
 ## Notificaciones
 
-Los avisos se envían por **Web Push desde el servidor**, así que llegan aunque la app esté cerrada. (Los temporizadores dentro de la app no sirven para esto: iOS los descarta al descargar la app de memoria, y `TimestampTrigger` —lo que permitiría al service worker dispararlos solo— no existe en Safari.)
+Los avisos se envían por **Web Push desde Supabase**, así que llegan aunque la app esté cerrada. (Los temporizadores dentro de la app no sirven para esto: iOS los descarta al descargar la app de memoria, y `TimestampTrigger` —lo que permitiría al service worker dispararlos solo— no existe en Safari.)
 
-Cómo funciona: el dispositivo registra una suscripción y sube *qué* quiere que le recuerden y *a qué minuto local*; un trabajo programado recorre los dispositivos y envía lo que toca. No hay cuentas: cada dispositivo guarda un id aleatorio y solo ve sus propios avisos.
+Cómo funciona: el dispositivo registra una suscripción y sube *qué* quiere que le recuerden y *a qué minuto local* a la Edge Function `push`; `pg_cron` la invoca **cada minuto** desde la propia base y ella envía lo que toca. No hay servidor propio ni cron externo: todo corre dentro de Supabase, en el plan gratis. Cada dispositivo guarda un id aleatorio y solo ve sus propios avisos.
 
 En iPhone requieren la app **añadida a la pantalla de inicio** (iOS 16.4+); en una pestaña de Safari ni siquiera se puede pedir permiso.
 
 ### Puesta en marcha
 
-1. **Generar las claves VAPID** (una sola vez):
+1. **Generar las claves VAPID** (una sola vez; si ya existe `.vapid-keys.json`, reutilízalas):
 
    ```bash
-   node -e "console.log(JSON.stringify(require('web-push').generateVAPIDKeys(),null,2))"
+   node -e "const w=require('web-push');console.log(JSON.stringify(w.generateVAPIDKeys(),null,2))"
    ```
 
-2. **Variables de entorno en Vercel** (Settings → Environment Variables):
+   (`web-push` ya no es dependencia del proyecto; ejecútalo con `npx -p web-push node -e ...` o instala el paquete de forma global.)
 
-   | Variable | Valor |
-   |---|---|
-   | `VAPID_PUBLIC_KEY` | la clave pública |
-   | `VAPID_PRIVATE_KEY` | la clave privada (nunca en el repo) |
-   | `VAPID_SUBJECT` | `mailto:tu@correo.com` |
-   | `PUSH_CRON_SECRET` | una cadena larga al azar, para que solo tu disparador pueda invocar el envío |
-   | `EXPO_PUBLIC_VAPID_PUBLIC_KEY` | la misma clave pública (la usa el cliente) |
-   | `BLOB_READ_WRITE_TOKEN` | lo añade Vercel al crear el Blob store |
+2. **Secretos de la función** en Supabase → Edge Functions → Secrets (o con la CLI):
 
-3. **Crear un Blob store**: en Vercel, Storage → Create → Blob. Guarda las suscripciones; no hace falta base de datos.
+   ```bash
+   npx supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:tu@correo.com --project-ref TU_REF
+   ```
 
-4. **Programar el disparador.** El cron de Vercel en plan Hobby corre *una vez al día con ±59 min de margen*, inservible para avisar a una hora concreta, así que queda solo como barrido de reconciliación. Para la precisión al minuto usa un disparador externo gratuito, por ejemplo [cron-job.org](https://cron-job.org):
+3. **Desplegar la función**:
 
-   - URL: `https://TU-APP.vercel.app/api/push/send?key=EL_PUSH_CRON_SECRET`
-   - Intervalo: cada 5 minutos (el margen de tolerancia del servidor es de 12 min, así que ningún aviso se pierde)
+   ```bash
+   npx supabase login
+   npx supabase functions deploy push --project-ref TU_REF
+   ```
 
-### Endpoints
+   `supabase/config.toml` ya trae `verify_jwt = false` para `push`: la función valida por su cuenta la anon key (app) y la service role key (cron).
+
+4. **Programar el envío**: ya está en `supabase/migrations/20261102000000_push_cron.sql`; se aplica con `npx supabase db push` junto con el resto. Activa `pg_cron` y `pg_net` y crea el job `day2day-push-send`, que llama a `/send` cada minuto con la clave pública del proyecto (no hace falta secreto: `/send` es idempotente). Para verlo correr: `select * from cron.job_run_details order by start_time desc limit 20;`
+
+5. **Cliente**: `VITE_VAPID_PUBLIC_KEY` en `.env.local` y en Vercel, con la misma clave pública.
+
+### Rutas de la función `push`
 
 | Ruta | Qué hace |
 |---|---|
-| `POST /api/push/subscribe` | Registra el dispositivo y reemplaza sus recordatorios |
-| `POST /api/push/test` | Envía un push de prueba a ese dispositivo |
-| `GET /api/push/send` | Envía todo lo que toque ahora; lo invoca el disparador |
+| `POST /functions/v1/push/subscribe` | Registra el dispositivo y reemplaza sus recordatorios |
+| `GET /functions/v1/push/status?deviceId=` | Dice si el servidor conoce ese dispositivo |
+| `POST /functions/v1/push/test` | Envía un push de prueba a ese dispositivo |
+| `POST /functions/v1/push/send` | Envía todo lo que toque ahora; solo con la service role key (pg_cron) |
 
-`/api/push/send` es idempotente: cada recordatorio anota la fecha local en que se envió, así que repetir la llamada no duplica avisos, y uno que se haya pasado de hora se recupera en la siguiente pasada mientras siga dentro de los 12 minutos de margen.
+`/send` es idempotente: cada recordatorio anota la fecha local en que se envió, así que repetir la llamada no duplica avisos, y uno que se haya pasado de hora se recupera en la siguiente pasada mientras siga dentro de los 12 minutos de margen.
 
 ## Desarrollo
 
-Requiere Node 22.13 o superior.
+Requiere Node 22 o superior.
 
 ```bash
 npm install
-npm start          # abre Expo; escanea el QR con la cámara del iPhone (app Expo Go)
-npm run web        # abre en el navegador
+npm run dev        # Vite en http://localhost:5173
+npm run typecheck  # tsc
 ```
 
-Para probar en el celular con Expo Go, el teléfono y el computador deben estar en la misma red WiFi. Si no conecta, usa `npx expo start --tunnel`.
+No hay backend propio: la app habla directo con Supabase (tablas y la Edge Function `push`). Para abrir la app en el celular dentro de la misma red: `npx vite --host`. Para probar la función en local: `npx supabase functions serve push --env-file .env.functions`.
 
 ## Build de producción (PWA)
 
 ```bash
-npm run build:web
+npm run build
 ```
 
-Genera `dist/`: el bundle de Expo más el manifest, el service worker y los íconos que hacen la app instalable.
+Genera `dist/`: `index.html` (ya con manifest, meta de iOS y registro del service worker), los assets con hash en `dist/assets/` y lo que hay en `public/` (manifest, `sw.js`, íconos).
 
 ## Despliegue en Vercel
 
-El repo incluye `vercel.json`, así que Vercel toma la configuración sola. Si necesitas ponerla a mano:
+Vercel solo sirve archivos estáticos; no hay funciones ni cron ahí. El repo incluye `vercel.json`, así que Vercel toma la configuración sola. Si necesitas ponerla a mano:
 
-- **Framework Preset**: Other
-- **Build Command**: `npm run build:web`
+- **Framework Preset**: Vite
+- **Build Command**: `npm run build`
 - **Output Directory**: `dist`
 
 ### Instalar en el iPhone
@@ -153,33 +206,45 @@ Los datos quedan guardados en el dispositivo y siguen ahí al cerrar la app.
 ## Estructura
 
 ```
-App.tsx                   Raíz: fuentes, gestos y providers
+index.html                Shell de la PWA (meta de iOS, manifest, service worker)
+vite.config.ts            Alias react-native → react-native-web, extensiones .web.*
+App.tsx                   Raíz: gestos, providers y color del tema en el navegador
 src/
+  main.tsx                Monta React y registra las fuentes (Plus Jakarta Sans, Ionicons)
   screens/
     RootScreen            Pestañas y estado compartido
     ScheduleScreen        Cronograma del día
     TodosScreen           Lista de pendientes
     ReportScreen          Reporte de constancia y rachas
     SettingsScreen        Temas, notificaciones, importar/exportar
-  components/             WeekStrip, TaskCard, TaskEditor, TimePicker, IconPicker,
-                          ScopeDialog, TodoRow, TabBar, StreakCalendar, ProgressRing,
-                          EmptyState
-  storage/                Persistencia local, hook de estado, estadísticas
-                          e importación JSON
+  components/             WeekStrip, DayModeBar, TaskCard, TaskEditor, TimePicker,
+                          IconPicker, ScopeDialog, TodoRow, TabBar, StreakCalendar,
+                          ProgressRing, EmptyState
+  storage/                Persistencia local, hook de estado, estadísticas,
+                          importación JSON, modos de día (dayModes.ts) y
+                          sincronización con Supabase (cloud.ts, syncQueue.ts,
+                          useCloudSync.ts)
+  auth/                   Sesión de Supabase (código por correo)
+  lib/supabase.ts         Cliente de Supabase del navegador
   theme/                  Tokens, paletas de color, categorías, catálogo de iconos
+                          y el componente Ionicons (fuente + glyph map)
   types/                  Modelo de datos
-  utils/                  Fechas, sonido y notificaciones
-api/push/                 Endpoints de Web Push (subscribe, send, test)
-api/_lib/store.js         Suscripciones y recordatorios en Vercel Blob
-scripts/build-pwa.js      Post-proceso del build web (manifest, service worker, meta de iOS)
+  utils/                  Fechas, sonido, vibración y notificaciones
+supabase/functions/push/  Edge Function de Web Push (subscribe, status, test, send)
+supabase/migrations/      Esquema SQL (tablas, RLS) y cron de envío; `supabase db push`
+supabase/config.toml      Config de la CLI (verify_jwt de la función)
 public/                   manifest.json, sw.js e íconos
 ```
 
 ## Notas de diseño
 
+- La base de datos es un espejo del modelo local, no una normalización: `completedDays`, `overrides`, etc. van como arrays y `jsonb`. Así una fila es una tarea completa y el sync es un *upsert* por fila, sin transacciones multi-tabla desde el cliente.
+- Los tiempos de edición (`updated_at`) son milisegundos del reloj del cliente, porque es lo que decide quién gana en un conflicto; el cursor del *pull* usa `synced_at`, del reloj del servidor, para que un teléfono con la hora atrasada no esconda filas a los demás.
 - Los días se guardan como `YYYY-MM-DD` en hora local, no como timestamps, para que una actividad no se corra de día por zona horaria.
 - Una rutina se guarda una sola vez y se proyecta sobre cada día que le toca. Completarla queda registrado por día, así que marcarla hoy no la marca mañana.
 - Editar un solo día de una rutina guarda un *override* para esa fecha, en vez de duplicar la actividad; el resto de la serie no se toca.
 - El sonido se sintetiza con la Web Audio API en lugar de cargar un archivo, para no sumar peso al bundle.
+- Un festivo no programa nada, así que para el reporte es un día sin actividades: ni suma un día perfecto ni corta la racha, igual que un domingo vacío.
+- El servidor de avisos solo entiende días de la semana, no "finca" o "festivo". El cliente resuelve las marcas de los próximos 90 días: las rutinas de finca suben como fechas sueltas y el resto sube con esos días en su lista de excepciones. Se recalcula en cada sincronización.
 - El reporte solo puntúa días ya transcurridos: contar el plan de mañana como incumplido haría que todo informe se viera mal. Hoy sí cuenta, porque el avance parcial es informativo, pero no rompe la racha hasta que termina.
 - Cada tema define su propia rampa de neutros en vez de compartir una gris, que es lo que hace que cambie el fondo y no solo el acento. Los contrastes de los seis temas, en claro y oscuro, cumplen WCAG AA.

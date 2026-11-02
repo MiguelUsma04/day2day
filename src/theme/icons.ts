@@ -1,7 +1,6 @@
-import type { ComponentProps } from 'react';
-import type { Ionicons } from '@expo/vector-icons';
+import type { IconName } from './Ionicons';
 
-export type IconName = ComponentProps<typeof Ionicons>['name'];
+export type { IconName };
 
 /**
  * Curated icon set for schedule entries, grouped so the picker stays scannable.

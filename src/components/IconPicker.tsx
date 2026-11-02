@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { Ionicons } from '../theme/Ionicons';
+import * as Haptics from '../utils/haptics';
 
 import { ICON_GROUPS, type IconName } from '../theme/icons';
 import { useTheme } from '../theme/ThemeProvider';

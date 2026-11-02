@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { Ionicons } from '../theme/Ionicons';
+import * as Haptics from '../utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { IconName } from '../theme/icons';

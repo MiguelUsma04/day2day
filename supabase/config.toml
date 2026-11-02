@@ -1,0 +1,8 @@
+# Supabase CLI config. Only what the project needs; the rest uses defaults.
+
+project_id = "day2day"
+
+[functions.push]
+# Auth is done inside the function (anon key for the app, service role for the
+# cron), so the gateway must not reject requests that carry no user JWT.
+verify_jwt = false

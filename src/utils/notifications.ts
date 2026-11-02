@@ -1,13 +1,14 @@
 import { Platform } from 'react-native';
 
-import type { Task, Weekday } from '../types/task';
+import type { DayModeMap } from '../storage/dayModes';
+import { occursOn } from '../storage/occurrence';
+import type { Task } from '../types/task';
 import { formatTime, toDayKey } from './date';
 
 /**
  * Reminders for the installed web app.
  *
- * `expo-notifications` has no web support, so this uses the browser Notification
- * API directly. On iOS that requires the app to be installed to the home screen
+ * Uses the browser Notification API directly. On iOS that requires the app to be installed to the home screen
  * (16.4+); in a plain Safari tab permission cannot even be requested.
  *
  * Timers are armed in-page, so reminders fire while the app is open or recently
@@ -17,6 +18,17 @@ import { formatTime, toDayKey } from './date';
  */
 
 export type PermissionState = 'unsupported' | 'default' | 'granted' | 'denied';
+
+const PUSH_SYNC_KEY = 'day2day:pushSync:v1';
+
+/** True once this device has uploaded its reminders to the push server. */
+function serverPushActive(): boolean {
+  try {
+    return localStorage.getItem(PUSH_SYNC_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 /** Longest delay we arm at once; beyond this, setTimeout drifts badly. */
@@ -78,35 +90,18 @@ function clearAll() {
   timers.clear();
 }
 
-/** Does a repeating task land on this day? Mirrors the schedule's own rule. */
-function occursToday(task: Task, dayKey: string): boolean {
-  if (task.repeat.kind === 'none') return task.date === dayKey;
-  if (dayKey < task.date) return false;
-  if (task.skippedDays.includes(dayKey)) return false;
-
-  const [y, m, d] = dayKey.split('-').map(Number);
-  const weekday = new Date(y, m - 1, d).getDay() as Weekday;
-  switch (task.repeat.kind) {
-    case 'daily':
-      return true;
-    case 'weekdays':
-      return weekday >= 1 && weekday <= 5;
-    case 'custom':
-      return task.repeat.days.includes(weekday);
-    default:
-      return false;
-  }
-}
-
 /**
  * Arms reminders for everything still ahead today.
  *
  * Takes the full task list rather than one day's view, so reminders stay armed
  * for today even while the user is browsing another date.
  */
-export function scheduleReminders(tasks: Task[]) {
+export function scheduleReminders(tasks: Task[], dayModes?: DayModeMap) {
   clearAll();
   if (!supported() || Notification.permission !== 'granted') return;
+  // Once the server sends pushes, an in-page timer for the same minute would
+  // show a second banner; the server copy is the one that also works closed.
+  if (serverPushActive()) return;
 
   const now = new Date();
   const todayKey = toDayKey(now);
@@ -114,7 +109,7 @@ export function scheduleReminders(tasks: Task[]) {
     now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000;
 
   for (const task of tasks) {
-    if (!occursToday(task, todayKey)) continue;
+    if (!occursOn(task, todayKey, dayModes)) continue;
     if (task.startMinutes === null || task.reminderMinutes === null) continue;
     if (task.completedDays.includes(todayKey)) continue;
 

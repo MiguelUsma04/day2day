@@ -2,9 +2,12 @@ import { isKnownIcon } from '../theme/icons';
 import {
   CATEGORIES,
   REPEAT_KINDS,
+  TASK_CONTEXTS,
   type Category,
+  type DayModeRecord,
   type RepeatKind,
   type Task,
+  type TaskContext,
   type TaskDraft,
   type Todo,
   type Weekday,
@@ -38,6 +41,12 @@ const CATEGORY_ALIASES: Record<string, Category> = {
   salud: 'health', health: 'health',
   estudio: 'study', study: 'study',
   otro: 'other', other: 'other',
+};
+
+const CONTEXT_ALIASES: Record<string, TaskContext> = {
+  cualquiera: 'any', cualquier: 'any', any: 'any', todos: 'any', siempre: 'any',
+  ciudad: 'city', city: 'city', casa: 'city',
+  finca: 'farm', farm: 'farm', campo: 'farm',
 };
 
 const REPEAT_ALIASES: Record<string, RepeatKind> = {
@@ -124,6 +133,25 @@ function parseRepeat(
   return { kind, days: kind === 'custom' ? parsedDays : [] };
 }
 
+/** Absent means the import-wide default; unknown values fall back to it with a warning. */
+function parseContext(
+  value: unknown,
+  fallback: TaskContext,
+  label: string,
+  warnings: string[],
+): TaskContext {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'string') {
+    const key = value.trim().toLowerCase();
+    const mapped =
+      CONTEXT_ALIASES[key] ??
+      ((TASK_CONTEXTS as readonly string[]).includes(key) ? (key as TaskContext) : undefined);
+    if (mapped) return mapped;
+  }
+  warnings.push(`${label}: contexto "${String(value)}" no reconocido.`);
+  return fallback;
+}
+
 function parseDuration(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
     return Math.min(12 * 60, Math.max(5, Math.round(value)));
@@ -167,7 +195,11 @@ export function looksLikeBackup(raw: string): boolean {
 }
 
 /** Parses the pasted document into task drafts, reporting what it could not read. */
-export function parseImport(raw: string, defaultDate: string): ImportResult {
+export function parseImport(
+  raw: string,
+  defaultDate: string,
+  defaultContext: TaskContext = 'any',
+): ImportResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -229,6 +261,7 @@ export function parseImport(raw: string, defaultDate: string): ImportResult {
       category: parseCategory(e.category, label, warnings),
       icon,
       repeat,
+      context: parseContext(e.context ?? e.donde ?? e.where, defaultContext, label, warnings),
       reminderMinutes: parseReminder(
         'reminder' in e ? e.reminder : e.reminderMinutes,
         startMinutes !== null,
@@ -250,14 +283,19 @@ export function parseImport(raw: string, defaultDate: string): ImportResult {
  * `completedDays` and `skippedDays`, or restoring it would silently wipe the
  * streaks and the progress report.
  */
-export function buildBackup(tasks: Task[], todos: Todo[]): string {
+export function buildBackup(
+  tasks: Task[],
+  todos: Todo[],
+  dayModes: DayModeRecord[] = [],
+): string {
   return JSON.stringify(
     {
-      version: 2,
+      version: 3,
       kind: 'backup',
       exportedAt: new Date().toISOString(),
       tasks,
       todos,
+      dayModes,
     },
     null,
     2,
@@ -265,7 +303,7 @@ export function buildBackup(tasks: Task[], todos: Todo[]): string {
 }
 
 export type BackupResult =
-  | { ok: true; tasks: Task[]; todos: Todo[] }
+  | { ok: true; tasks: Task[]; todos: Todo[]; dayModes: DayModeRecord[] }
   | { ok: false; error: string };
 
 /** Reads a file produced by buildBackup, restoring history as well as content. */
@@ -280,7 +318,7 @@ export function parseBackup(raw: string): BackupResult {
   if (typeof parsed !== 'object' || parsed === null) {
     return { ok: false, error: 'El respaldo no tiene el formato esperado.' };
   }
-  const p = parsed as { kind?: unknown; tasks?: unknown; todos?: unknown };
+  const p = parsed as { kind?: unknown; tasks?: unknown; todos?: unknown; dayModes?: unknown };
   if (p.kind !== 'backup' || !Array.isArray(p.tasks)) {
     return { ok: false, error: 'Esto no parece un respaldo de day2day.' };
   }
@@ -289,6 +327,7 @@ export function parseBackup(raw: string): BackupResult {
     ok: true,
     tasks: p.tasks as Task[],
     todos: Array.isArray(p.todos) ? (p.todos as Todo[]) : [],
+    dayModes: Array.isArray(p.dayModes) ? (p.dayModes as DayModeRecord[]) : [],
   };
 }
 
@@ -308,6 +347,7 @@ export function buildExport(tasks: Task[]): string {
       icon: t.icon,
       repeat: t.repeat.kind,
       ...(t.repeat.kind === 'custom' ? { days: t.repeat.days } : {}),
+      ...(t.context !== 'any' ? { context: t.context } : {}),
       ...(t.reminderMinutes !== null ? { reminder: t.reminderMinutes } : {}),
       ...(t.notes ? { notes: t.notes } : {}),
       ...(t.repeat.kind === 'none' ? { date: t.date } : {}),
@@ -377,6 +417,17 @@ export function buildSample(): string {
           category: 'personal',
           icon: 'book-outline',
           repeat: 'daily',
+        },
+        {
+          title: 'Regar el huerto',
+          time: '07:00',
+          duration: 30,
+          category: 'personal',
+          icon: 'leaf-outline',
+          repeat: 'custom',
+          days: ['sab', 'dom'],
+          context: 'finca',
+          notes: 'Solo aparece los fines de semana marcados como finca.',
         },
       ],
     },

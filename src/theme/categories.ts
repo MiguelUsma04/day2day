@@ -1,10 +1,9 @@
 import type { ComponentProps } from 'react';
-import type { Ionicons } from '@expo/vector-icons';
+import type { IconName } from './Ionicons';
 
 import type { Category } from '../types/task';
 import { palette } from './tokens';
 
-type IconName = ComponentProps<typeof Ionicons>['name'];
 
 export type CategoryMeta = {
   label: string;

@@ -5,6 +5,7 @@ import { TabBar, type TabId } from '../components/TabBar';
 import { useTasks } from '../storage/useTasks';
 import { useTheme } from '../theme/ThemeProvider';
 import { toDayKey } from '../utils/date';
+import { useAuth } from '../auth/AuthProvider';
 import { scheduleReminders } from '../utils/notifications';
 import { syncReminders, uploadBeacon } from '../utils/webpush';
 import { ReportScreen } from './ReportScreen';
@@ -18,7 +19,8 @@ import { TodosScreen } from './TodosScreen';
  */
 export function RootScreen() {
   const { colors } = useTheme();
-  const store = useTasks();
+  const { user } = useAuth();
+  const store = useTasks(user?.id ?? null);
   const [tab, setTab] = useState<TabId>('schedule');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
 
@@ -33,28 +35,32 @@ export function RootScreen() {
   // stale one means the reminders silently stop arriving.
   useEffect(() => {
     if (store.isLoading) return;
-    void syncReminders(store.tasks);
+    void syncReminders(store.tasks, store.dayModes);
 
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        void syncReminders(store.tasks);
+        void syncReminders(store.tasks, store.dayModes);
       } else {
         // Leaving the app cancels a pending fetch, so an edit made just before
         // closing would never reach the server. A beacon survives teardown.
-        uploadBeacon(store.tasks);
+        uploadBeacon(store.tasks, store.dayModes);
       }
     };
+    const onHide = () => uploadBeacon(store.tasks, store.dayModes);
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('pagehide', () => uploadBeacon(store.tasks));
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [store.tasks, store.isLoading]);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pagehide', onHide);
+    };
+  }, [store.tasks, store.dayModes, store.isLoading]);
 
   useEffect(() => {
     if (store.isLoading) return;
-    scheduleReminders(store.tasks);
+    scheduleReminders(store.tasks, store.dayModes);
 
-    const rearm = () => scheduleReminders(store.tasks);
+    const rearm = () => scheduleReminders(store.tasks, store.dayModes);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') rearm();
     });
@@ -76,7 +82,7 @@ export function RootScreen() {
       sub.remove();
       detachVisibility?.();
     };
-  }, [store.tasks, store.isLoading]);
+  }, [store.tasks, store.dayModes, store.isLoading]);
 
   const dayKey = toDayKey(selectedDate);
   const tasks = store.getTasksForDay(dayKey);
@@ -99,6 +105,9 @@ export function RootScreen() {
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             markedDays={store.markedDays}
+            dayModes={store.dayModes}
+            dayMode={store.getDayMode(dayKey)}
+            onSetDayMode={store.setDayMode}
             tasks={tasks}
             onToggle={store.toggleTask}
             onAdd={store.addTask}
@@ -122,12 +131,17 @@ export function RootScreen() {
           />
         ) : null}
 
-        {tab === 'report' ? <ReportScreen tasks={store.tasks} todos={store.todos} /> : null}
+        {tab === 'report' ? (
+          <ReportScreen tasks={store.tasks} todos={store.todos} dayModes={store.dayModes} />
+        ) : null}
 
         {tab === 'settings' ? (
           <SettingsScreen
             tasks={store.tasks}
             todos={store.todos}
+            dayModes={store.dayModes}
+            dayModeList={store.dayModeList}
+            cloud={store.cloud}
             onImport={store.importTasks}
             onRestore={store.restoreBackup}
             onClear={store.clearData}

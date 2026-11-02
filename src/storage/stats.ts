@@ -1,5 +1,6 @@
 import type { Task, Todo } from '../types/task';
 import { addDays, toDayKey } from '../utils/date';
+import type { DayModeMap } from './dayModes';
 import { occursOn } from './occurrence';
 
 /**
@@ -8,6 +9,9 @@ import { occursOn } from './occurrence';
  * Only days that already happened are scored: counting tomorrow's untouched
  * schedule as "failed" would make every report look bad. Today is included
  * because partial progress is still worth seeing.
+ *
+ * A holiday schedules nothing, so it is neither a perfect day nor a broken
+ * streak: the streak simply carries over it, like any day without activities.
  */
 
 export type DayScore = {
@@ -54,7 +58,12 @@ function isComplete(day: DayScore): boolean {
   return day.scheduled > 0 && day.done === day.scheduled;
 }
 
-export function computeStats(tasks: Task[], todos: Todo[], windowDays: number): Stats {
+export function computeStats(
+  tasks: Task[],
+  todos: Todo[],
+  windowDays: number,
+  dayModes?: DayModeMap,
+): Stats {
   const today = new Date();
   const todayKey = toDayKey(today);
 
@@ -65,7 +74,7 @@ export function computeStats(tasks: Task[], todos: Todo[], windowDays: number): 
     let done = 0;
 
     for (const task of tasks) {
-      if (!occursOn(task, dayKey)) continue;
+      if (!occursOn(task, dayKey, dayModes)) continue;
       scheduled += 1;
       if (task.completedDays.includes(dayKey)) done += 1;
     }
@@ -114,7 +123,7 @@ export function computeStats(tasks: Task[], todos: Todo[], windowDays: number): 
   for (const day of days) {
     if (day.dayKey === todayKey) continue;
     for (const task of tasks) {
-      if (!occursOn(task, day.dayKey)) continue;
+      if (!occursOn(task, day.dayKey, dayModes)) continue;
       const existing = perTask.get(task.id);
       const doneToday = task.completedDays.includes(day.dayKey) ? 1 : 0;
       if (existing) {

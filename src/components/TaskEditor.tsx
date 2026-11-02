@@ -10,8 +10,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { Ionicons } from '../theme/Ionicons';
+import * as Haptics from '../utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { categoryMeta, categoryTint } from '../theme/categories';
@@ -23,6 +23,7 @@ import {
   type Category,
   type Repeat,
   type RepeatKind,
+  type TaskContext,
   type TaskDraft,
   type TaskInstance,
   type Weekday,
@@ -43,6 +44,22 @@ const MAX_DURATION = 12 * 60;
  * activity's own start time, which is what a routine wants: the cue to begin.
  */
 const DEFAULT_REMINDER = 0;
+
+const CONTEXTS: { value: TaskContext; label: string; icon: IconName; hint: string }[] = [
+  { value: 'any', label: 'Cualquier día', icon: 'calendar-outline', hint: 'Aparece siempre.' },
+  {
+    value: 'city',
+    label: 'Ciudad',
+    icon: 'business-outline',
+    hint: 'Entre semana, y los fines de semana marcados como ciudad.',
+  },
+  {
+    value: 'farm',
+    label: 'Finca',
+    icon: 'leaf-outline',
+    hint: 'Solo los días marcados como finca.',
+  },
+];
 
 const REMINDERS: { value: number | null; label: string }[] = [
   { value: null, label: 'Sin aviso' },
@@ -92,6 +109,7 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
   const [category, setCategory] = useState<Category>('personal');
   const [repeat, setRepeat] = useState<Repeat>(NO_REPEAT);
   const [icon, setIcon] = useState<IconName | undefined>(undefined);
+  const [context, setContext] = useState<TaskContext>('any');
   const [reminderMinutes, setReminderMinutes] = useState<number | null>(DEFAULT_REMINDER);
   const [touched, setTouched] = useState(false);
 
@@ -105,6 +123,7 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
     setCategory(task?.category ?? 'personal');
     setRepeat(task?.repeat ?? NO_REPEAT);
     setIcon((task?.icon as IconName | undefined) ?? undefined);
+    setContext(task?.context ?? 'any');
     // Existing activities keep whatever they had, including "no reminder".
     setReminderMinutes(task ? task.reminderMinutes : DEFAULT_REMINDER);
     setTouched(false);
@@ -127,6 +146,7 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
       category,
       icon,
       repeat,
+      context,
       reminderMinutes: startMinutes === null ? null : reminderMinutes,
     });
   };
@@ -366,6 +386,50 @@ export function TaskEditor({ visible, dayKey, task, onClose, onSave, onDelete }:
               </View>
 
               <View style={styles.field}>
+                <Text style={[styles.label, { color: colors.foreground }]}>Dónde</Text>
+                <View style={styles.chipRow}>
+                  {CONTEXTS.map((c) => {
+                    const active = c.value === context;
+                    return (
+                      <Pressable
+                        key={c.value}
+                        onPress={() => {
+                          void Haptics.selectionAsync();
+                          setContext(c.value);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        style={[
+                          styles.categoryChip,
+                          {
+                            backgroundColor: active ? colors.primary : colors.muted,
+                            borderColor: active ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={c.icon}
+                          size={15}
+                          color={active ? colors.onPrimary : colors.mutedForeground}
+                        />
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: active ? colors.onPrimary : colors.foreground },
+                          ]}
+                        >
+                          {c.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                  {CONTEXTS.find((c) => c.value === context)?.hint}
+                </Text>
+              </View>
+
+              <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.foreground }]}>Icono</Text>
                 <IconPicker
                   value={icon}
@@ -580,6 +644,7 @@ const styles = StyleSheet.create({
   form: { gap: spacing.xl, paddingBottom: spacing.lg },
   field: { gap: spacing.sm },
   label: { fontFamily: fontFamily.semibold, fontSize: fontSize.footnote },
+  hint: { fontFamily: fontFamily.regular, fontSize: fontSize.caption, lineHeight: 18 },
   labelRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   labelValue: { fontFamily: fontFamily.bold, fontSize: fontSize.footnote },
   stepper: {

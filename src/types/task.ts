@@ -15,6 +15,33 @@ export type Repeat = {
 
 export const NO_REPEAT: Repeat = { kind: 'none', days: [] };
 
+/**
+ * Where an activity belongs. Weekends can be spent in the city or at the farm
+ * and carry different routines; weekdays are implicitly "city".
+ */
+export const TASK_CONTEXTS = ['any', 'city', 'farm'] as const;
+export type TaskContext = (typeof TASK_CONTEXTS)[number];
+
+/**
+ * How a given day is being spent. Weekends default to 'city'; a weekday marked
+ * 'holiday' shows no activities and does not count against the streak.
+ */
+export const DAY_MODES = ['city', 'farm', 'holiday'] as const;
+export type DayMode = (typeof DAY_MODES)[number];
+
+/** A day's mode, resolved with defaults: weekdays are 'normal' unless marked. */
+export type ResolvedDayMode = DayMode | 'normal';
+
+/** One explicitly marked day. `id` is the day key itself, so it syncs like any record. */
+export type DayModeRecord = {
+  id: string;
+  /** Local "YYYY-MM-DD". Same as id; kept for symmetry with the other records. */
+  date: string;
+  mode: DayMode;
+  createdAt: number;
+  updatedAt: number;
+};
+
 /** Fields a single day can override on a repeating task. */
 export type Override = Partial<
   Pick<Task, 'title' | 'notes' | 'startMinutes' | 'durationMinutes' | 'category' | 'icon'>
@@ -37,6 +64,8 @@ export type Task = {
   /** Ionicons name; falls back to the category icon when absent. */
   icon?: string;
   repeat: Repeat;
+  /** Which kind of day this belongs to; 'any' shows everywhere. */
+  context: TaskContext;
   /**
    * Completion is per-day, keyed by "YYYY-MM-DD", so finishing a routine today
    * leaves tomorrow's instance untouched.
@@ -49,11 +78,16 @@ export type Task = {
   /** Minutes before the start time to fire a reminder; null disables it. */
   reminderMinutes: number | null;
   createdAt: number;
+  /**
+   * Last local change, in ms. Drives sync: when the same record was edited on
+   * two devices, the later edit wins.
+   */
+  updatedAt: number;
 };
 
 export type TaskDraft = Omit<
   Task,
-  'id' | 'createdAt' | 'completedDays' | 'skippedDays' | 'overrides'
+  'id' | 'createdAt' | 'updatedAt' | 'completedDays' | 'skippedDays' | 'overrides'
 >;
 
 /** A task resolved onto one specific day, ready to render. */
@@ -76,4 +110,6 @@ export type Todo = {
   date: string;
   done: boolean;
   createdAt: number;
+  /** Last local change, in ms; see Task.updatedAt. */
+  updatedAt: number;
 };

@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { Ionicons } from '../theme/Ionicons';
+import * as Haptics from '../utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '../components/EmptyState';
 import { StreakCalendar } from '../components/StreakCalendar';
+import type { DayModeMap } from '../storage/dayModes';
 import { computeStats, type HabitScore } from '../storage/stats';
 import { categoryMeta, categoryTint } from '../theme/categories';
 import type { IconName } from '../theme/icons';
@@ -23,6 +24,7 @@ const WINDOWS = [
 type Props = {
   tasks: Task[];
   todos: Todo[];
+  dayModes: DayModeMap;
 };
 
 /** Plain-language verdict, so the numbers arrive with an interpretation. */
@@ -34,14 +36,14 @@ function verdict(rate: number, activeDays: number): { text: string; icon: IconNa
   return { text: 'Se te está escapando el plan. Prueba con menos actividades y horarios más realistas.', icon: 'alert-circle-outline' };
 }
 
-export function ReportScreen({ tasks, todos }: Props) {
+export function ReportScreen({ tasks, todos, dayModes }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [windowDays, setWindowDays] = useState(30);
 
   const stats = useMemo(
-    () => computeStats(tasks, todos, windowDays),
-    [tasks, todos, windowDays],
+    () => computeStats(tasks, todos, windowDays, dayModes),
+    [tasks, todos, windowDays, dayModes],
   );
 
   const card = [

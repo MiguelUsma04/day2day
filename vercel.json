@@ -1,9 +1,10 @@
 {
-  "buildCommand": "npm run build:web",
+  "framework": "vite",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
@@ -36,7 +37,7 @@
       ]
     },
     {
-      "source": "/_expo/static/(.*)",
+      "source": "/assets/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -70,12 +71,6 @@
           "value": "public, max-age=0, must-revalidate"
         }
       ]
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/push/send",
-      "schedule": "0 5 * * *"
     }
   ]
 }

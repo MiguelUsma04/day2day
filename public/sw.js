@@ -10,7 +10,7 @@
  * worker and this file never caches index.html's HTML for longer than a request.
  */
 
-const CACHE = 'day2day-v6';
+const CACHE = 'day2day-v7';
 const APP_SHELL = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {

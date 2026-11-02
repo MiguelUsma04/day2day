@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../utils/haptics';
 
+import { resolveDayMode, type DayModeMap } from '../storage/dayModes';
+import { Ionicons } from '../theme/Ionicons';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import { addDays, dayShort, isSameDay, toDayKey } from '../utils/date';
@@ -18,9 +20,11 @@ type Props = {
   onSelect: (date: Date) => void;
   /** Day keys that have at least one task, for the dot indicator. */
   markedDays: Set<string>;
+  /** Marked days; farm and holiday days get a small glyph instead of the dot. */
+  dayModes?: DayModeMap;
 };
 
-export function WeekStrip({ selected, onSelect, markedDays }: Props) {
+export function WeekStrip({ selected, onSelect, markedDays, dayModes }: Props) {
   const { colors, isDark } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -55,6 +59,8 @@ export function WeekStrip({ selected, onSelect, markedDays }: Props) {
         const active = isSameDay(day, selected);
         const today = isSameDay(day, new Date());
         const marked = markedDays.has(key);
+        const mode = resolveDayMode(dayModes, key);
+        const special = mode === 'farm' || mode === 'holiday';
 
         return (
           <Pressable
@@ -65,7 +71,9 @@ export function WeekStrip({ selected, onSelect, markedDays }: Props) {
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            accessibilityLabel={`${dayShort(day)} ${day.getDate()}`}
+            accessibilityLabel={`${dayShort(day)} ${day.getDate()}${
+              mode === 'farm' ? ', finca' : mode === 'holiday' ? ', festivo' : ''
+            }`}
             style={({ pressed }) => [
               styles.day,
               {
@@ -93,6 +101,16 @@ export function WeekStrip({ selected, onSelect, markedDays }: Props) {
             </Text>
 
             {/* Dot doubles as the "today" marker, so state never rests on colour alone. */}
+            {special ? (
+              <Ionicons
+                name={mode === 'farm' ? 'leaf' : 'flag'}
+                size={9}
+                color={
+                  active ? colors.onPrimary : mode === 'farm' ? colors.accent : colors.destructive
+                }
+                style={styles.glyph}
+              />
+            ) : (
             <View
               style={[
                 styles.dot,
@@ -107,6 +125,7 @@ export function WeekStrip({ selected, onSelect, markedDays }: Props) {
                 },
               ]}
             />
+            )}
           </Pressable>
         );
       })}
@@ -149,4 +168,5 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginTop: 2,
   },
+  glyph: { marginTop: 1 },
 });

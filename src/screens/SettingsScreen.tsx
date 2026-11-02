@@ -9,8 +9,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { Ionicons } from '../theme/Ionicons';
+import * as Haptics from '../utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -21,11 +21,15 @@ import {
   parseBackup,
   parseImport,
 } from '../storage/importExport';
+import { ACCOUNTS, accountFor } from '../auth/accounts';
+import { useAuth } from '../auth/AuthProvider';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import type { CloudSync } from '../storage/useCloudSync';
 import { shadow } from '../theme/shadows';
 import { MODES, useTheme, type ModePreference } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
-import type { Task, TaskDraft, Todo } from '../types/task';
+import type { DayModeMap } from '../storage/dayModes';
+import type { DayModeRecord, Task, TaskContext, TaskDraft, Todo } from '../types/task';
 import { toDayKey } from '../utils/date';
 import { armedCount } from '../utils/notifications';
 import { isSoundEnabled, playComplete, setSoundEnabled } from '../utils/sound';
@@ -50,8 +54,11 @@ const MODE_LABELS: Record<ModePreference, string> = {
 type Props = {
   tasks: Task[];
   todos: Todo[];
+  dayModes: DayModeMap;
+  dayModeList: DayModeRecord[];
+  cloud: CloudSync;
   onImport: (tasks: TaskDraft[], replace: boolean) => number;
-  onRestore: (tasks: Task[], todos: Todo[]) => void;
+  onRestore: (tasks: Task[], todos: Todo[], dayModes: DayModeRecord[]) => void;
   onClear: (what: { tasks?: boolean; todos?: boolean; history?: boolean }) => void;
 };
 
@@ -114,15 +121,103 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: Props) {
+/** "hace 2 min" style label for the last sync. */
+function since(ms: number | null): string {
+  if (ms === null) return 'todavía no';
+  const diff = Math.max(0, Date.now() - ms);
+  if (diff < 60000) return 'hace un momento';
+  const min = Math.round(diff / 60000);
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  return h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} d`;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const IMPORT_CONTEXTS: { value: TaskContext; label: string }[] = [
+  { value: 'any', label: 'Cualquier día' },
+  { value: 'city', label: 'Ciudad' },
+  { value: 'farm', label: 'Finca' },
+];
+
+export function SettingsScreen({
+  tasks,
+  todos,
+  dayModes,
+  dayModeList,
+  cloud,
+  onImport,
+  onRestore,
+  onClear,
+}: Props) {
   const { colors, isDark, themeId, mode, options, setThemeId, setMode } = useTheme();
   const insets = useSafeAreaInsets();
+  const auth = useAuth();
+
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
 
   const [sound, setSound] = useState(isSoundEnabled());
   const [importText, setImportText] = useState('');
   const [replaceAll, setReplaceAll] = useState(false);
+  const [importContext, setImportContext] = useState<TaskContext>('any');
   const [feedback, setFeedback] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null);
   const [pendingClear, setPendingClear] = useState<ClearKind | null>(null);
+
+  const handleRequestCode = useCallback(async (chosen?: string) => {
+    const value = (chosen ?? email).trim();
+    if (chosen) setEmail(chosen);
+    if (!EMAIL_RE.test(value)) {
+      setFeedback({ tone: 'error', message: 'Escribe un correo válido.' });
+      return;
+    }
+    void Haptics.selectionAsync();
+    setAuthBusy(true);
+    const result = await auth.requestCode(value);
+    setAuthBusy(false);
+    if (result.ok) {
+      setCodeSent(true);
+      setFeedback({ tone: 'ok', message: `Te enviamos un código a ${value}. Revisa también spam.` });
+    } else {
+      setFeedback({ tone: 'error', message: result.error });
+    }
+  }, [auth, email]);
+
+  const handleVerifyCode = useCallback(async () => {
+    if (code.replace(/\s+/g, '').length < 6) {
+      setFeedback({ tone: 'error', message: 'El código tiene 6 dígitos.' });
+      return;
+    }
+    void Haptics.selectionAsync();
+    setAuthBusy(true);
+    const result = await auth.verifyCode(email, code);
+    setAuthBusy(false);
+    if (result.ok) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setCode('');
+      setCodeSent(false);
+      setFeedback({
+        tone: 'ok',
+        message: 'Sesión iniciada. Lo que tenías en este dispositivo se está subiendo a tu cuenta.',
+      });
+    } else {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setFeedback({ tone: 'error', message: result.error });
+    }
+  }, [auth, email, code]);
+
+  const handleSignOut = useCallback(async () => {
+    void Haptics.selectionAsync();
+    setAuthBusy(true);
+    await auth.signOut();
+    setAuthBusy(false);
+    setFeedback({
+      tone: 'ok',
+      message: 'Sesión cerrada. Tus datos siguen en este dispositivo y en tu cuenta.',
+    });
+  }, [auth]);
 
   const [armed, setArmed] = useState(0);
   const [pushState, setPushState] = useState<PushState>('unsupported');
@@ -173,12 +268,12 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
   ).length;
   // What the device would actually upload: one entry per recurring activity
   // plus one for each day edited on its own.
-  const expectedOnServer = buildReminders(tasks).length;
+  const expectedOnServer = buildReminders(tasks, dayModes).length;
 
   const handleEnablePush = useCallback(async () => {
     void Haptics.selectionAsync();
     setBusy(true);
-    const next = await enablePush(tasks);
+    const next = await enablePush(tasks, dayModes);
     setPushState(next);
     setPushSync(lastSync());
     if (next === 'subscribed') void isRegistered().then(setRegistered);
@@ -199,12 +294,12 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
         message: 'Primero añade la app a la pantalla de inicio desde Safari.',
       });
     }
-  }, [tasks]);
+  }, [tasks, dayModes]);
 
   const handleTestPush = useCallback(async () => {
     void Haptics.selectionAsync();
     setBusy(true);
-    const result = await sendTestPush(tasks);
+    const result = await sendTestPush(tasks, dayModes);
     setBusy(false);
     if (result.ok) {
       // Delivery is proof of registration; reflect it without waiting a poll.
@@ -221,7 +316,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
           }
         : { tone: 'error', message: result.error ?? 'No se pudo enviar.' },
     );
-  }, [tasks]);
+  }, [tasks, dayModes]);
 
   const handleImport = useCallback(() => {
     if (looksLikeBackup(importText)) {
@@ -233,7 +328,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
       });
       return;
     }
-    const result = parseImport(importText, toDayKey(new Date()));
+    const result = parseImport(importText, toDayKey(new Date()), importContext);
     if (!result.ok) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setFeedback({ tone: 'error', message: result.error });
@@ -248,7 +343,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
         `Se importaron ${count} actividades.` +
         (result.warnings.length ? ` Avisos: ${result.warnings.slice(0, 3).join(' ')}` : ''),
     });
-  }, [importText, replaceAll, onImport]);
+  }, [importText, replaceAll, importContext, onImport]);
 
   const handleSample = useCallback(async () => {
     void Haptics.selectionAsync();
@@ -272,7 +367,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
       setFeedback({ tone: 'error', message: 'Todavía no hay nada que respaldar.' });
       return;
     }
-    const content = buildBackup(tasks, todos);
+    const content = buildBackup(tasks, todos, dayModeList);
     const stamp = toDayKey(new Date());
     if (downloadJson(`day2day-respaldo-${stamp}.json`, content)) {
       setFeedback({ tone: 'ok', message: 'Respaldo descargado. Guárdalo en Archivos o envíatelo.' });
@@ -286,7 +381,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
     } else {
       setFeedback({ tone: 'error', message: 'No se pudo generar el respaldo en este navegador.' });
     }
-  }, [tasks, todos]);
+  }, [tasks, todos, dayModeList]);
 
   const handleRestore = useCallback(() => {
     const result = parseBackup(importText);
@@ -295,7 +390,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
       setFeedback({ tone: 'error', message: result.error });
       return;
     }
-    onRestore(result.tasks, result.todos);
+    onRestore(result.tasks, result.todos, result.dayModes);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setImportText('');
     setFeedback({
@@ -355,6 +450,209 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
       showsVerticalScrollIndicator={false}
     >
       <Text style={[styles.screenTitle, { color: colors.foreground }]}>Ajustes</Text>
+
+      {/* ---- Account & sync ---- */}
+      {auth.configured ? (
+        <View style={card}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Cuenta</Text>
+          {auth.user ? (
+            <>
+              <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
+                {accountFor(auth.user.email)
+                  ? `${accountFor(auth.user.email)?.name} · ${auth.user.email}`
+                  : auth.user.email}
+              </Text>
+              <View style={[styles.statusRow, { borderColor: colors.border }]}>
+                <Ionicons
+                  name={
+                    cloud.error
+                      ? 'alert-circle-outline'
+                      : cloud.syncing
+                        ? 'sync-outline'
+                        : 'cloud-done-outline'
+                  }
+                  size={16}
+                  color={cloud.error ? colors.destructive : colors.accent}
+                />
+                <Text style={[styles.cardHint, { color: colors.mutedForeground, flex: 1 }]}>
+                  {cloud.error
+                    ? cloud.error
+                    : cloud.syncing
+                      ? 'Sincronizando…'
+                      : cloud.pending > 0
+                        ? `${cloud.pending} ${cloud.pending === 1 ? 'cambio pendiente' : 'cambios pendientes'} de subir.`
+                        : `Todo sincronizado · ${since(cloud.lastSyncAt)}.`}
+                </Text>
+              </View>
+              <View style={styles.btnRow}>
+                <Pressable
+                  onPress={() => {
+                    void Haptics.selectionAsync();
+                    void cloud.syncNow();
+                  }}
+                  disabled={cloud.syncing}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.secondaryBtn,
+                    styles.flexBtn,
+                    { borderColor: colors.border, opacity: cloud.syncing ? 0.5 : pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Ionicons name="sync-outline" size={16} color={colors.foreground} />
+                  <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                    Sincronizar
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleSignOut}
+                  disabled={authBusy}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.secondaryBtn,
+                    styles.flexBtn,
+                    { borderColor: colors.border, opacity: authBusy ? 0.5 : pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Ionicons name="log-out-outline" size={16} color={colors.foreground} />
+                  <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                    Cerrar sesión
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
+                {ACCOUNTS.length > 0
+                  ? 'Toca tu nombre y te llega un código al correo. Sin contraseña.'
+                  : 'Inicia sesión para guardar tu cronograma en la nube y verlo en cualquier dispositivo. Sin contraseña: te llega un código al correo.'}
+              </Text>
+              {ACCOUNTS.length > 0 && !codeSent ? (
+                <View style={styles.btnRow}>
+                  {ACCOUNTS.map((account) => (
+                    <Pressable
+                      key={account.email}
+                      onPress={() => void handleRequestCode(account.email)}
+                      disabled={authBusy}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Entrar como ${account.name}`}
+                      style={({ pressed }) => [
+                        styles.primaryBtn,
+                        styles.flexBtn,
+                        {
+                          backgroundColor: colors.primary,
+                          opacity: authBusy ? 0.5 : pressed ? 0.85 : 1,
+                        },
+                      ]}
+                    >
+                      <Ionicons name="person-circle-outline" size={18} color={colors.onPrimary} />
+                      <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
+                        {account.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                editable={!codeSent && !authBusy}
+                placeholder="tu@correo.com"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                accessibilityLabel="Correo"
+                style={[
+                  styles.input,
+                  {
+                    color: colors.foreground,
+                    borderColor: colors.border,
+                    backgroundColor: colors.muted,
+                    opacity: codeSent ? 0.6 : 1,
+                    display: ACCOUNTS.length > 0 && !codeSent ? 'none' : 'flex',
+                  },
+                ]}
+              />
+              {codeSent ? (
+                <>
+                  <TextInput
+                    value={code}
+                    onChangeText={setCode}
+                    editable={!authBusy}
+                    placeholder="Código de 6 dígitos"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="number-pad"
+                    autoComplete="sms-otp"
+                    textContentType="oneTimeCode"
+                    maxLength={8}
+                    accessibilityLabel="Código"
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.foreground,
+                        borderColor: colors.border,
+                        backgroundColor: colors.muted,
+                      },
+                    ]}
+                  />
+                  <Pressable
+                    onPress={handleVerifyCode}
+                    disabled={authBusy}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      styles.primaryBtn,
+                      {
+                        backgroundColor: colors.primary,
+                        opacity: authBusy ? 0.5 : pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Ionicons name="log-in-outline" size={18} color={colors.onPrimary} />
+                    <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>Entrar</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setCodeSent(false);
+                      setCode('');
+                    }}
+                    disabled={authBusy}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      styles.secondaryBtn,
+                      { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+                    ]}
+                  >
+                    <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                      Cambiar correo o pedir otro código
+                    </Text>
+                  </Pressable>
+                </>
+              ) : ACCOUNTS.length > 0 ? null : (
+                <Pressable
+                  onPress={() => void handleRequestCode()}
+                  disabled={authBusy}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.primaryBtn,
+                    {
+                      backgroundColor: colors.primary,
+                      opacity: authBusy ? 0.5 : pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <Ionicons name="mail-outline" size={18} color={colors.onPrimary} />
+                  <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
+                    Enviarme un código
+                  </Text>
+                </Pressable>
+              )}
+            </>
+          )}
+        </View>
+      ) : null}
 
       {/* ---- Appearance ---- */}
       <View style={card}>
@@ -513,7 +811,7 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
               onPress={async () => {
                 void Haptics.selectionAsync();
                 setBusy(true);
-                const ok = await syncReminders(tasks);
+                const ok = await syncReminders(tasks, dayModes);
                 const status = await serverStatus();
                 setServerCount(status?.reminders ?? null);
                 setBusy(false);
@@ -661,6 +959,49 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
           ]}
         />
 
+        <Text style={[styles.optionLabel, { color: colors.foreground, marginTop: spacing.xs }]}>
+          Estas actividades son de
+        </Text>
+        <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
+          {importContext === 'farm'
+            ? 'Solo se mostrarán los fines de semana marcados como finca.'
+            : importContext === 'city'
+              ? 'Entre semana y los fines de semana de ciudad; se ocultan en finca.'
+              : 'Se mostrarán todos los días. Si el JSON trae "context" por actividad, manda eso.'}
+        </Text>
+        <View style={styles.chipRow}>
+          {IMPORT_CONTEXTS.map((c) => {
+            const active = c.value === importContext;
+            return (
+              <Pressable
+                key={c.value}
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  setImportContext(c.value);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.muted,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: active ? colors.onPrimary : colors.foreground },
+                  ]}
+                >
+                  {c.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <View style={styles.switchRow}>
           <View style={styles.switchText}>
             <Text style={[styles.optionLabel, { color: colors.foreground }]}>
@@ -801,7 +1142,9 @@ export function SettingsScreen({ tasks, todos, onImport, onRestore, onClear }: P
       />
 
       <Text style={[styles.footer, { color: colors.mutedForeground }]}>
-        Tus datos se guardan solo en este dispositivo.
+        {auth.user
+          ? 'Tus datos se guardan en este dispositivo y en tu cuenta.'
+          : 'Tus datos se guardan solo en este dispositivo.'}
       </Text>
     </ScrollView>
   );
@@ -872,6 +1215,15 @@ const styles = StyleSheet.create({
   secondaryBtnText: { fontFamily: fontFamily.medium, fontSize: fontSize.label },
   btnRow: { flexDirection: 'row', gap: spacing.sm },
   flexBtn: { flex: 1 },
+  input: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    fontFamily: fontFamily.regular,
+    fontSize: fontSize.footnote,
+    marginTop: spacing.xs,
+  },
   textarea: {
     minHeight: 120,
     borderRadius: radius.md,

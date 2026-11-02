@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, LayoutAnimation, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { Ionicons } from '../theme/Ionicons';
+import * as Haptics from '../utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { DayModeBar } from '../components/DayModeBar';
 import { EmptyState } from '../components/EmptyState';
 import { ProgressRing } from '../components/ProgressRing';
 import { ScopeDialog } from '../components/ScopeDialog';
@@ -14,7 +15,8 @@ import { WeekStrip } from '../components/WeekStrip';
 import { shadow } from '../theme/shadows';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
-import type { EditScope, TaskDraft, TaskInstance } from '../types/task';
+import type { DayModeMap } from '../storage/dayModes';
+import type { DayMode, EditScope, ResolvedDayMode, TaskDraft, TaskInstance } from '../types/task';
 import { friendlyDate, isToday, minutesSinceMidnight, toDayKey } from '../utils/date';
 import { playDelete } from '../utils/sound';
 
@@ -22,6 +24,10 @@ type Props = {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   markedDays: Set<string>;
+  dayModes: DayModeMap;
+  /** How the selected day is spent, defaults already applied. */
+  dayMode: ResolvedDayMode;
+  onSetDayMode: (dayKey: string, mode: DayMode | null) => void;
   tasks: TaskInstance[];
   onToggle: (id: string, dayKey: string) => void;
   onAdd: (draft: TaskDraft) => void;
@@ -39,6 +45,9 @@ export function ScheduleScreen({
   selectedDate,
   onSelectDate,
   markedDays,
+  dayModes,
+  dayMode,
+  onSetDayMode,
   tasks,
   onToggle,
   onAdd,
@@ -210,7 +219,14 @@ export function ScheduleScreen({
         ) : null}
       </View>
 
-      <WeekStrip selected={selectedDate} onSelect={onSelectDate} markedDays={markedDays} />
+      <WeekStrip
+        selected={selectedDate}
+        onSelect={onSelectDate}
+        markedDays={markedDays}
+        dayModes={dayModes}
+      />
+
+      <DayModeBar dayKey={dayKey} mode={dayMode} onChange={(mode) => onSetDayMode(dayKey, mode)} />
 
       <FlatList
         style={styles.listBox}
@@ -232,10 +248,22 @@ export function ScheduleScreen({
         ]}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListEmptyComponent={
-          <EmptyState
-            title="Todavía no hay nada aquí"
-            description="Añade tu primera actividad y arma la rutina de tu día, desde que te levantas hasta que te duermes."
-          />
+          dayMode === 'holiday' ? (
+            <EmptyState
+              title="Día festivo"
+              description="Hoy no hay actividades programadas. La racha no se afecta: sigue donde iba."
+            />
+          ) : dayMode === 'farm' ? (
+            <EmptyState
+              title="Día de finca"
+              description="Todavía no hay actividades de finca. Impórtalas desde Ajustes eligiendo «Finca», o crea una y márcala como de finca."
+            />
+          ) : (
+            <EmptyState
+              title="Todavía no hay nada aquí"
+              description="Añade tu primera actividad y arma la rutina de tu día, desde que te levantas hasta que te duermes."
+            />
+          )
         }
         showsVerticalScrollIndicator={false}
       />

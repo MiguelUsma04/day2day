@@ -1,18 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { NO_REPEAT, type Task, type Todo } from '../types/task';
+import {
+  DAY_MODES,
+  NO_REPEAT,
+  TASK_CONTEXTS,
+  type DayModeRecord,
+  type Task,
+  type Todo,
+} from '../types/task';
 
 const TASKS_KEY = 'day2day:tasks:v1';
 const TODOS_KEY = 'day2day:todos:v1';
+const DAY_MODES_KEY = 'day2day:dayModes:v1';
 
 /** Fills in fields added after a record was written, so older data still loads. */
-function normalizeTask(raw: unknown): Task | null {
+export function normalizeTask(raw: unknown): Task | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const t = raw as Partial<Task>;
   if (typeof t.id !== 'string' || typeof t.title !== 'string' || typeof t.date !== 'string') {
     return null;
   }
 
+  const createdAt = typeof t.createdAt === 'number' ? t.createdAt : Date.now();
   return {
     id: t.id,
     title: t.title,
@@ -23,6 +32,9 @@ function normalizeTask(raw: unknown): Task | null {
     category: t.category ?? 'other',
     icon: typeof t.icon === 'string' ? t.icon : undefined,
     repeat: t.repeat ?? NO_REPEAT,
+    context: (TASK_CONTEXTS as readonly string[]).includes(t.context as string)
+      ? (t.context as Task['context'])
+      : 'any',
     completedDays: Array.isArray(t.completedDays) ? t.completedDays : [],
     skippedDays: Array.isArray(t.skippedDays) ? t.skippedDays : [],
     overrides:
@@ -30,23 +42,69 @@ function normalizeTask(raw: unknown): Task | null {
         ? t.overrides
         : {},
     reminderMinutes: typeof t.reminderMinutes === 'number' ? t.reminderMinutes : null,
-    createdAt: typeof t.createdAt === 'number' ? t.createdAt : Date.now(),
+    createdAt,
+    // Records written before sync existed carry no updatedAt; their creation
+    // time is the best guess and keeps them older than any real edit.
+    updatedAt: typeof t.updatedAt === 'number' ? t.updatedAt : createdAt,
   };
 }
 
-function normalizeTodo(raw: unknown): Todo | null {
+export function normalizeTodo(raw: unknown): Todo | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const t = raw as Partial<Todo>;
   if (typeof t.id !== 'string' || typeof t.title !== 'string' || typeof t.date !== 'string') {
     return null;
   }
+  const createdAt = typeof t.createdAt === 'number' ? t.createdAt : Date.now();
   return {
     id: t.id,
     title: t.title,
     date: t.date,
     done: t.done === true,
-    createdAt: typeof t.createdAt === 'number' ? t.createdAt : Date.now(),
+    createdAt,
+    updatedAt: typeof t.updatedAt === 'number' ? t.updatedAt : createdAt,
   };
+}
+
+export function normalizeDayMode(raw: unknown): DayModeRecord | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Partial<DayModeRecord>;
+  const id = typeof r.id === 'string' ? r.id : typeof r.date === 'string' ? r.date : null;
+  if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(id)) return null;
+  if (!(DAY_MODES as readonly string[]).includes(r.mode as string)) return null;
+  const createdAt = typeof r.createdAt === 'number' ? r.createdAt : Date.now();
+  return {
+    id,
+    date: id,
+    mode: r.mode as DayModeRecord['mode'],
+    createdAt,
+    updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : createdAt,
+  };
+}
+
+async function loadList<T>(key: string, normalize: (raw: unknown) => T | null): Promise<T[]> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalize).filter((t): t is T => t !== null);
+  } catch {
+    // A corrupt payload should not brick the app; start clean instead.
+    return [];
+  }
+}
+
+export function loadDayModes(): Promise<DayModeRecord[]> {
+  return loadList(DAY_MODES_KEY, normalizeDayMode);
+}
+
+export async function saveDayModes(records: DayModeRecord[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(DAY_MODES_KEY, JSON.stringify(records));
+  } catch {
+    // Best-effort, as below.
+  }
 }
 
 export async function loadTasks(): Promise<Task[]> {
