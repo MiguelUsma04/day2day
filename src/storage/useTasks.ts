@@ -30,6 +30,13 @@ function createId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+/** Gap left between items when one lands at either end of the list. */
+const ORDER_STEP = 1000;
+
+function byOrder(a: Todo, b: Todo): number {
+  return a.order - b.order || a.createdAt - b.createdAt;
+}
+
 /**
  * Scheduled entries sort by start time; unscheduled ones trail in creation order.
  *
@@ -341,7 +348,7 @@ export function useTasks(userId: string | null) {
       const now = Date.now();
       setTodos((prev) => [
         ...prev,
-        { id: createId(), title, date, done: false, createdAt: now, updatedAt: now },
+        { id: createId(), title, date, done: false, order: now, createdAt: now, updatedAt: now },
       ]);
     },
     [setTodos],
@@ -371,6 +378,42 @@ export function useTasks(userId: string | null) {
   const toggleTodo = useCallback(
     (id: string) => {
       setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    },
+    [setTodos],
+  );
+
+  /**
+   * Drops a pending item at `index` among the day's other pending items.
+   * Only the moved item changes: its order becomes the midpoint of its new
+   * neighbours, so one row goes up to the server instead of the whole list.
+   */
+  const reorderTodo = useCallback(
+    (id: string, index: number) => {
+      setTodos((prev) => {
+        const me = prev.find((t) => t.id === id);
+        if (!me || me.done) return prev;
+        const others = prev
+          .filter((t) => t.date === me.date && !t.done && t.id !== id)
+          .sort(byOrder);
+        const at = Math.max(0, Math.min(index, others.length));
+        const before = others[at - 1];
+        const after = others[at];
+        let order: number;
+        if (before && after) order = (before.order + after.order) / 2;
+        else if (before) order = before.order + ORDER_STEP;
+        else if (after) order = after.order - ORDER_STEP;
+        else order = me.order;
+        // Two neighbours so close that the midpoint collapses: spread the
+        // whole list out again. Rare, and the list is short.
+        if ((before && order <= before.order) || (after && order >= after.order)) {
+          const spread = [...others.slice(0, at), me, ...others.slice(at)];
+          const base = Date.now();
+          const orders = new Map(spread.map((t, i) => [t.id, base + i * ORDER_STEP]));
+          return prev.map((t) => (orders.has(t.id) ? { ...t, order: orders.get(t.id)! } : t));
+        }
+        if (order === me.order) return prev;
+        return prev.map((t) => (t.id === id ? { ...t, order } : t));
+      });
     },
     [setTodos],
   );
@@ -422,7 +465,7 @@ export function useTasks(userId: string | null) {
       todos
         .filter((t) => t.date === dayKey)
         // Done items sink, matching how the schedule orders itself.
-        .sort((a, b) => (a.done !== b.done ? (a.done ? 1 : -1) : a.createdAt - b.createdAt)),
+        .sort((a, b) => (a.done !== b.done ? (a.done ? 1 : -1) : byOrder(a, b))),
     [todos],
   );
 
@@ -449,6 +492,7 @@ export function useTasks(userId: string | null) {
     updateTodo,
     moveTodo,
     toggleTodo,
+    reorderTodo,
     deleteTodo,
     getTodosForDay,
   };

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   LayoutAnimation,
@@ -36,7 +37,13 @@ type Props = {
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onMove: (id: string, deltaDays: number) => void;
+  /** Drops a pending item at `index` among the day's pending items. */
+  onReorder: (id: string, index: number) => void;
 };
+
+/** Space between rows; part of the distance a row travels when it makes room. */
+const ROW_GAP = spacing.sm;
+const FALLBACK_HEIGHT = 56;
 
 export function TodosScreen({
   selectedDate,
@@ -48,6 +55,7 @@ export function TodosScreen({
   onDelete,
   onRename,
   onMove,
+  onReorder,
 }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -57,6 +65,109 @@ export function TodosScreen({
 
   const dayKey = toDayKey(selectedDate);
   const doneCount = todos.filter((t) => t.done).length;
+
+  /*
+   * Drag to reorder. `todos` arrives sorted with pending items first, so the
+   * pending ones are simply the first N. Heights come from onLayout; the
+   * slot of row i is the sum of the heights (plus gaps) above it, which
+   * avoids depending on how the list positions its cells. The row under the
+   * finger follows the finger; the others spring up or down by its height
+   * as the target slot changes, and on release the store gets the index.
+   */
+  const heights = useRef(new Map<string, number>()).current;
+  const offsets = useRef(new Map<string, Animated.Value>()).current;
+  const dragRef = useRef<{ id: string; from: number; to: number } | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  const offsetFor = useCallback(
+    (id: string) => {
+      let v = offsets.get(id);
+      if (!v) {
+        v = new Animated.Value(0);
+        offsets.set(id, v);
+      }
+      return v;
+    },
+    [offsets],
+  );
+
+  const pending = todos.filter((t) => !t.done);
+  const heightOf = (id: string) => heights.get(id) ?? FALLBACK_HEIGHT;
+  const slotTop = (index: number) => {
+    let y = 0;
+    for (let i = 0; i < index; i++) y += heightOf(pending[i].id) + ROW_GAP;
+    return y;
+  };
+
+  const handleDragStart = useCallback(
+    (id: string) => {
+      const from = pending.findIndex((t) => t.id === id);
+      if (from === -1) return;
+      dragRef.current = { id, from, to: from };
+      setDraggingId(id);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [todos],
+  );
+
+  const handleDragMove = useCallback(
+    (id: string, dy: number) => {
+      const drag = dragRef.current;
+      if (!drag || drag.id !== id) return;
+      offsetFor(id).setValue(dy);
+
+      const h = heightOf(id);
+      const center = slotTop(drag.from) + dy + h / 2;
+      let to = 0;
+      for (let i = 0; i < pending.length; i++) {
+        if (i === drag.from) continue;
+        if (slotTop(i) + heightOf(pending[i].id) / 2 < center) to++;
+      }
+      if (to === drag.to) return;
+      drag.to = to;
+      void Haptics.selectionAsync();
+
+      const travel = h + ROW_GAP;
+      for (let i = 0; i < pending.length; i++) {
+        if (i === drag.from) continue;
+        const shift = i > drag.from && i <= to ? -travel : i < drag.from && i >= to ? travel : 0;
+        Animated.spring(offsetFor(pending[i].id), {
+          toValue: shift,
+          useNativeDriver: true,
+          speed: 24,
+          bounciness: 2,
+        }).start();
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [todos, offsetFor],
+  );
+
+  const handleDragEnd = useCallback(
+    (id: string) => {
+      const drag = dragRef.current;
+      if (!drag || drag.id !== id) return;
+      dragRef.current = null;
+      setDraggingId(null);
+
+      if (drag.to === drag.from) {
+        // Nothing changed: ease everything back where it was.
+        for (const v of offsets.values()) {
+          Animated.spring(v, { toValue: 0, useNativeDriver: true, speed: 24, bounciness: 4 }).start();
+        }
+        return;
+      }
+      // The data is about to re-sort into the dragged positions, so every
+      // offset must be zero by the time that render lands.
+      for (const v of offsets.values()) {
+        v.stopAnimation();
+        v.setValue(0);
+      }
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onReorder(id, drag.to);
+    },
+    [offsets, onReorder],
+  );
 
   const submit = useCallback(() => {
     const value = draft.trim();
@@ -147,17 +258,29 @@ export function TodosScreen({
         style={styles.listBox}
         data={todos}
         keyExtractor={(item) => item.id}
+        extraData={draggingId}
+        scrollEnabled={draggingId === null}
         renderItem={({ item }) => (
-          <TodoRow
-            todo={item}
-            onToggle={handleToggle}
-            onDelete={() => setConfirmDelete(item)}
-            onRename={onRename}
-            onMove={handleMove}
-          />
+          <View
+            onLayout={(e) => heights.set(item.id, e.nativeEvent.layout.height)}
+            style={draggingId === item.id ? styles.liftedCell : null}
+          >
+            <TodoRow
+              todo={item}
+              onToggle={handleToggle}
+              onDelete={() => setConfirmDelete(item)}
+              onRename={onRename}
+              onMove={handleMove}
+              translateY={offsetFor(item.id)}
+              lifted={draggingId === item.id}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragEnd={handleDragEnd}
+            />
+          </View>
         )}
         contentContainerStyle={[styles.list, { paddingBottom: spacing.xl }]}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+        ItemSeparatorComponent={() => <View style={{ height: ROW_GAP }} />}
         ListEmptyComponent={
           <EmptyState
             title="Sin pendientes"
@@ -241,6 +364,9 @@ export function TodosScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  // The list's cells have no z-index of their own, so raising the item is
+  // enough for the lifted row to paint over the cells that follow it.
+  liftedCell: { zIndex: 10 },
   header: { paddingHorizontal: spacing.lg, gap: spacing.xs, paddingBottom: spacing.xs },
   eyebrow: { fontFamily: fontFamily.medium, fontSize: fontSize.label, letterSpacing: 0.2 },
   title: { fontFamily: fontFamily.bold, fontSize: fontSize.headline, lineHeight: 36 },

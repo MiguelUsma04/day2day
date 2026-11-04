@@ -128,6 +128,7 @@ export function RootScreen() {
             onDelete={store.deleteTodo}
             onRename={store.updateTodo}
             onMove={store.moveTodo}
+            onReorder={store.reorderTodo}
           />
         ) : null}
 

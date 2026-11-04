@@ -11,7 +11,7 @@ PWA web pura: React + react-native-web empaquetados con Vite, instalable en el i
 - **Deslizar para actuar**: a la derecha completa (con sonido), a la izquierda elimina pidiendo confirmación.
 - **Fin de semana de ciudad o de finca**: cada sábado y domingo tiene un selector. Las actividades marcadas como *Finca* solo aparecen en días de finca; las de *Ciudad* entre semana y en fines de semana de ciudad; las de *Cualquier día* siempre. Así conviven dos rutinas sin mezclarse.
 - **Festivos**: de lunes a viernes se puede marcar el día como festivo. Ese día no muestra actividades y la racha sigue intacta.
-- **Lista de pendientes** aparte del cronograma, para lo que no tiene hora fija; se editan tocando su texto y se mueven de día deslizándolos a los lados.
+- **Lista de pendientes** aparte del cronograma, para lo que no tiene hora fija; se editan tocando su texto, se mueven de día deslizándolos a los lados y se ordenan arrastrándolos desde el asa de la derecha.
 - **Lo completado baja al final** de la lista, así lo que falta queda arriba.
 - **Recordatorios** por Web Push, que llegan con la app cerrada; a la hora de inicio por defecto y configurables por actividad.
 - **Iconos** por actividad, elegidos de un catálogo.
@@ -90,7 +90,7 @@ La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la ba
 
 - **Entrar**: pantalla de inicio → tocar *Miguel* o *Karen* → contraseña. Una vez por dispositivo: la sesión se guarda en `localStorage` y se renueva sola hasta que se cierra desde Ajustes → Cuenta. Sin enlaces mágicos: en iPhone abrirían Safari y no la app instalada.
 - **Solo esas cuentas**: el registro está cerrado (*Allow new users to sign up* apagado en Supabase). Los nombres y correos salen de `VITE_ACCOUNTS`; si no está definida, la app muestra un campo de correo normal.
-- **Qué se sincroniza**: actividades (con historial, overrides y días saltados), pendientes y los días marcados como finca o festivo. Los ajustes de tema y sonido son por dispositivo.
+- **Qué se sincroniza**: actividades (con historial, overrides y días saltados), pendientes (con su orden) y los días marcados como finca o festivo. Los ajustes de tema y sonido son por dispositivo.
 - **Cómo**: cada cambio local entra en una cola persistida (`day2day:syncQueue:v1`) y se sube con un pequeño retraso; al abrir la app, al volver a primer plano y al recuperar la red se hace un *pull* incremental por `synced_at` (reloj del servidor). En un conflicto gana el `updatedAt` más reciente; un borrado gana a una edición anterior. Los borrados son lógicos (`deleted_at`) para que lleguen a los demás dispositivos.
 - **Primer inicio de sesión**: lo que solo existe en el dispositivo se sube; lo que solo existe en la cuenta se baja.
 - **Cerrar sesión** no borra nada: el dispositivo conserva su copia.

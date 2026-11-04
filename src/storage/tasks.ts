@@ -61,6 +61,7 @@ export function normalizeTodo(raw: unknown): Todo | null {
     title: t.title,
     date: t.date,
     done: t.done === true,
+    order: typeof t.order === 'number' && Number.isFinite(t.order) ? t.order : createdAt,
     createdAt,
     updatedAt: typeof t.updatedAt === 'number' ? t.updatedAt : createdAt,
   };

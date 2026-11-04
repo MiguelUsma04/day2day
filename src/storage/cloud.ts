@@ -48,6 +48,8 @@ export type TodoRow = {
   title: string;
   date: string;
   done: boolean;
+  /** Null on rows written before ordering existed; falls back to created_at. */
+  sort_order: number | null;
   created_at: number;
   updated_at: number;
   deleted_at: number | null;
@@ -117,6 +119,7 @@ export function toTodoRow(todo: Todo, userId: string): TodoRow {
     title: todo.title,
     date: todo.date,
     done: todo.done,
+    sort_order: todo.order,
     created_at: todo.createdAt,
     updated_at: todo.updatedAt,
     deleted_at: null,
@@ -129,6 +132,7 @@ export function fromTodoRow(row: TodoRow): Todo | null {
     title: row.title,
     date: row.date,
     done: row.done,
+    order: row.sort_order ?? row.created_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -221,7 +225,17 @@ export async function upsertTaskRows(rows: TaskRow[]): Promise<void> {
 export async function upsertTodoRows(rows: TodoRow[]): Promise<void> {
   if (!supabase || rows.length === 0) return;
   const { error } = await supabase.from('todos').upsert(rows, { onConflict: 'id' });
-  if (error) throw error;
+  if (!error) return;
+  // A server that predates `sort_order` (migration 20261104 not applied yet)
+  // rejects the whole batch over that one column. Keep everything else in
+  // sync and let the order stay per device until the column lands.
+  if (error.code === 'PGRST204' || error.code === '42703') {
+    const legacy = rows.map(({ sort_order: _dropped, ...rest }) => rest);
+    const retry = await supabase.from('todos').upsert(legacy, { onConflict: 'id' });
+    if (retry.error) throw retry.error;
+    return;
+  }
+  throw error;
 }
 
 export async function upsertDayModeRows(rows: DayModeRow[]): Promise<void> {

@@ -109,6 +109,13 @@ export type Todo = {
   /** Local "YYYY-MM-DD" the item belongs to. */
   date: string;
   done: boolean;
+  /**
+   * Position in the day's list, chosen by dragging; lower comes first. It is
+   * a float so a drop between two neighbours takes their midpoint and only
+   * the moved item changes. Defaults to `createdAt`, which keeps the old
+   * "in the order they were written" behaviour for untouched lists.
+   */
+  order: number;
   createdAt: number;
   /** Last local change, in ms; see Task.updatedAt. */
   updatedAt: number;

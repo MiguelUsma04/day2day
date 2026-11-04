@@ -22,9 +22,31 @@ type Props = {
   onRename: (id: string, title: string) => void;
   /** Shifts the item by whole days: +1 tomorrow, -1 yesterday. */
   onMove: (id: string, deltaDays: number) => void;
+  /**
+   * Reordering by drag. The list owns the geometry: it drives `translateY`
+   * for every row (the one under the finger and the ones making room) and
+   * tells this row whether it is the lifted one. Without `onDragStart` the
+   * handle is not rendered at all.
+   */
+  translateY?: Animated.Value;
+  lifted?: boolean;
+  onDragStart?: (id: string) => void;
+  onDragMove?: (id: string, dy: number) => void;
+  onDragEnd?: (id: string) => void;
 };
 
-export function TodoRow({ todo, onToggle, onDelete, onRename, onMove }: Props) {
+export function TodoRow({
+  todo,
+  onToggle,
+  onDelete,
+  onRename,
+  onMove,
+  translateY,
+  lifted = false,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}: Props) {
   const { colors, isDark } = useTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(todo.title);
@@ -133,7 +155,28 @@ export function TodoRow({ todo, onToggle, onDelete, onRename, onMove }: Props) {
     }).start();
   }, [translateX]);
 
+  /**
+   * The reorder handle: any movement on it starts a drag, so the list scroll
+   * never competes (touchAction="none" on the detector keeps the browser out
+   * too). The row-level swipe only activates past a horizontal offset, so it
+   * loses to this one on a vertical pull.
+   */
+  const drag = Gesture.Pan()
+    .minDistance(1)
+    .onStart(() => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onDragStart?.(todo.id);
+    })
+    .onUpdate((event) => {
+      onDragMove?.(todo.id, event.translationY);
+    })
+    .onFinalize(() => {
+      onDragEnd?.(todo.id);
+    })
+    .runOnJS(true);
+
   const pan = Gesture.Pan()
+    .enabled(!lifted)
     .activeOffsetX([-ACTIVATION, ACTIVATION])
     // Keeps the vertical list scroll from being stolen by a near-vertical drag.
     .failOffsetY([-14, 14])
@@ -176,8 +219,16 @@ export function TodoRow({ todo, onToggle, onDelete, onRename, onMove }: Props) {
     extrapolate: 'clamp',
   });
 
+  const canDrag = !todo.done && onDragStart !== undefined;
+
   return (
-    <View style={styles.container}>
+    <Animated.View
+      style={[
+        styles.container,
+        translateY ? { transform: [{ translateY }] } : null,
+        lifted ? styles.lifted : null,
+      ]}
+    >
       <View
         style={styles.actions}
         pointerEvents="none"
@@ -212,11 +263,12 @@ export function TodoRow({ todo, onToggle, onDelete, onRename, onMove }: Props) {
           <View
             style={[
               styles.row,
-              shadow('sm', isDark),
+              shadow(lifted ? 'md' : 'sm', isDark),
               {
                 backgroundColor: colors.surface,
-                borderColor: colors.border,
+                borderColor: lifted ? colors.primary : colors.border,
                 opacity: pressed ? 0.85 : 1,
+                transform: [{ scale: lifted ? 1.02 : 1 }],
               },
             ]}
           >
@@ -287,15 +339,44 @@ export function TodoRow({ todo, onToggle, onDelete, onRename, onMove }: Props) {
             >
               <Ionicons name="close" size={18} color={colors.mutedForeground} />
             </Pressable>
+
+            {canDrag ? (
+              <GestureDetector gesture={drag} touchAction="none">
+                <View
+                  style={[styles.handle, webGrab]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Reordenar ${todo.title}`}
+                  accessibilityHint="Arrastra hacia arriba o abajo para cambiar el orden."
+                >
+                  <Ionicons
+                    name="reorder-two-outline"
+                    size={22}
+                    color={lifted ? colors.primary : colors.mutedForeground}
+                  />
+                </View>
+              </GestureDetector>
+            ) : null}
           </View>
         </Animated.View>
       </GestureDetector>
-    </View>
+    </Animated.View>
   );
 }
 
+// react-native-web honours `cursor`; the RN types do not know it.
+const webGrab = (Platform.OS === 'web' ? { cursor: 'grab' } : null) as object | null;
+
 const styles = StyleSheet.create({
   container: { borderRadius: radius.lg, overflow: 'hidden' },
+  // Above its neighbours while dragged; `overflow` would clip the lift.
+  lifted: { zIndex: 10, elevation: 10, overflow: 'visible' },
+  handle: {
+    width: 36,
+    height: TOUCH_TARGET,
+    marginRight: -spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   actions: { ...StyleSheet.absoluteFillObject, flexDirection: 'row' },
   action: {
     flex: 1,
