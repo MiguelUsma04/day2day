@@ -90,6 +90,13 @@ export const spacing = {
   xxxl: 48,
 } as const;
 
+/**
+ * The app is a phone layout. On a wider viewport (desktop browser, tablet) it
+ * stays this wide and sits centred instead of stretching edge to edge; the
+ * modals cap themselves to the same width so they line up with the frame.
+ */
+export const PHONE_MAX_WIDTH = 480;
+
 export const radius = {
   sm: 8,
   md: 12,

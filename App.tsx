@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -7,10 +7,15 @@ import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RootScreen } from './src/screens/RootScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
+import { PHONE_MAX_WIDTH } from './src/theme/tokens';
 
 function Themed() {
   const { colors, isDark } = useTheme();
   const auth = useAuth();
+  const { width } = useWindowDimensions();
+  // Wider than a phone: keep the phone layout and centre it, with a hairline
+  // on each side so the frame reads as a frame and not as a cut-off page.
+  const framed = width > PHONE_MAX_WIDTH;
 
   // The browser chrome (and the iOS status bar of an installed PWA) follows
   // the theme-color meta tag, so keep it in step with the active palette.
@@ -37,7 +42,22 @@ function Themed() {
     body = <RootScreen />;
   }
 
-  return <View style={{ flex: 1, backgroundColor: colors.background }}>{body}</View>;
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center' }}>
+      <View
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: PHONE_MAX_WIDTH,
+          borderLeftWidth: framed ? 1 : 0,
+          borderRightWidth: framed ? 1 : 0,
+          borderColor: colors.border,
+        }}
+      >
+        {body}
+      </View>
+    </View>
+  );
 }
 
 export default function App() {

@@ -4,7 +4,7 @@ import { Ionicons } from '../theme/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../theme/ThemeProvider';
-import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
+import { fontFamily, fontSize, PHONE_MAX_WIDTH, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import type { EditScope } from '../types/task';
 
 type Props = {
@@ -133,6 +133,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.lg,
     gap: spacing.sm,
+    width: '100%',
+    maxWidth: PHONE_MAX_WIDTH - spacing.lg * 2,
+    alignSelf: 'center',
   },
   iconCircle: {
     width: 44,

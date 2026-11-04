@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { IconName } from '../theme/icons';
 import { useTheme } from '../theme/ThemeProvider';
-import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
+import { fontFamily, fontSize, PHONE_MAX_WIDTH, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 
 type Props = {
   visible: boolean;
@@ -98,7 +98,15 @@ export function ConfirmDialog({
 
 const styles = StyleSheet.create({
   scrim: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: spacing.lg },
-  card: { borderRadius: radius.xl, borderWidth: 1, padding: spacing.lg, gap: spacing.sm },
+  card: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    width: '100%',
+    maxWidth: PHONE_MAX_WIDTH - spacing.lg * 2,
+    alignSelf: 'center',
+  },
   iconCircle: {
     width: 44,
     height: 44,

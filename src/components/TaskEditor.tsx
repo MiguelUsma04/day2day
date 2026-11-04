@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { categoryMeta, categoryTint } from '../theme/categories';
 import { useTheme } from '../theme/ThemeProvider';
-import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
+import { fontFamily, fontSize, PHONE_MAX_WIDTH, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import {
   CATEGORIES,
   NO_REPEAT,
@@ -616,7 +616,9 @@ const styles = StyleSheet.create({
   scrimTap: { flex: 1 },
   // flexShrink lets the sheet give way to the keyboard; the ScrollView inside
   // then has a bounded height and can actually scroll.
-  sheetWrap: { flexShrink: 1 },
+  // Same width as the app frame, so on desktop the sheet rises under the app
+  // and not across the whole window.
+  sheetWrap: { flexShrink: 1, width: '100%', maxWidth: PHONE_MAX_WIDTH, alignSelf: 'center' },
   sheet: {
     flexShrink: 1,
     borderTopLeftRadius: radius.xl,
