@@ -20,7 +20,7 @@ PWA web pura: React + react-native-web empaquetados con Vite, instalable en el i
 - **Reporte de constancia**: porcentaje cumplido, rachas, días perfectos, calendario de los últimos días y qué hábitos se te dan mejor o peor.
 - **Seis temas de color** (azul, rosa, lila, ámbar, verde, coral) que tiñen toda la interfaz —fondo, tarjetas y bordes incluidos—, más modo claro/oscuro/automático.
 - **Progreso diario** y marcador **"Ahora"** sobre la actividad en curso.
-- **Dos cuentas, cerradas**: Miguel y Karen. Se entra tocando el nombre y escribiendo el código que llega al correo; no hay registro abierto ni contraseñas. Con sesión, los datos se sincronizan con Supabase y aparecen en cualquier dispositivo; lo que ya tenías en el teléfono se sube solo la primera vez. Sin sesión la app sigue funcionando en local.
+- **Dos cuentas, cerradas**: Miguel y Karen. Al abrir la app por primera vez en un dispositivo se toca el nombre y se escribe la contraseña; la sesión queda guardada y no vuelve a pedirla. No hay registro abierto. Los datos se sincronizan con Supabase y aparecen en cualquier dispositivo; lo que ya tenías en el teléfono se sube solo la primera vez.
 
 ## Formato de importación
 
@@ -86,10 +86,10 @@ Cada sábado y domingo se marca desde el cronograma, en el selector bajo la tira
 
 ## Cuenta y sincronización
 
-La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la base de datos es la copia compartida. Iniciar sesión es opcional.
+La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la base de datos es la copia compartida. Con Supabase configurado, la app pide sesión al abrir; sin las variables, corre solo en local.
 
-- **Entrar**: Ajustes → Cuenta → tocar *Miguel* o *Karen* → código de 6 dígitos. Sin contraseña ni enlaces: en iPhone un enlace mágico abriría Safari y no la app instalada.
-- **Solo esas cuentas**: el registro está cerrado (`shouldCreateUser: false` y *Allow new users to sign up* apagado en Supabase). Los nombres y correos salen de `VITE_ACCOUNTS`; si no está definida, la app muestra un campo de correo normal.
+- **Entrar**: pantalla de inicio → tocar *Miguel* o *Karen* → contraseña. Una vez por dispositivo: la sesión se guarda en `localStorage` y se renueva sola hasta que se cierra desde Ajustes → Cuenta. Sin enlaces mágicos: en iPhone abrirían Safari y no la app instalada.
+- **Solo esas cuentas**: el registro está cerrado (*Allow new users to sign up* apagado en Supabase). Los nombres y correos salen de `VITE_ACCOUNTS`; si no está definida, la app muestra un campo de correo normal.
 - **Qué se sincroniza**: actividades (con historial, overrides y días saltados), pendientes y los días marcados como finca o festivo. Los ajustes de tema y sonido son por dispositivo.
 - **Cómo**: cada cambio local entra en una cola persistida (`day2day:syncQueue:v1`) y se sube con un pequeño retraso; al abrir la app, al volver a primer plano y al recuperar la red se hace un *pull* incremental por `synced_at` (reloj del servidor). En un conflicto gana el `updatedAt` más reciente; un borrado gana a una edición anterior. Los borrados son lógicos (`deleted_at`) para que lleguen a los demás dispositivos.
 - **Primer inicio de sesión**: lo que solo existe en el dispositivo se sube; lo que solo existe en la cuenta se baja.
@@ -100,16 +100,8 @@ La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la ba
 1. Crea un proyecto en [supabase.com](https://supabase.com).
 2. **SQL Editor** → pega y ejecuta `supabase/migrations/20261101000000_init.sql`. Crea `tasks`, `todos` y `push_devices` con RLS.
 3. **Authentication → Sign In / Providers**: *Email* activo; apaga **Allow new users to sign up** para que nadie más pueda crear cuenta.
-4. **Authentication → Users → Add user → Create new user**: una para Miguel y otra para Karen, con su correo real, cualquier contraseña (no se usa) y **Auto Confirm User** marcado. Repite para la segunda.
-5. **Authentication → Email Templates → Magic Link**: la app pide un **código**, no un enlace, así que el cuerpo del correo debe incluir `{{ .Token }}`. Por ejemplo:
-
-   ```html
-   <h2>Tu código para entrar a day2day</h2>
-   <p style="font-size:28px;letter-spacing:4px"><strong>{{ .Token }}</strong></p>
-   <p>Vence en una hora. Si no lo pediste, ignora este correo.</p>
-   ```
-
-6. **Variables de entorno** (ver `.env.example`):
+4. **Authentication → Users → Add user → Create new user**: una para Miguel y otra para Karen, con su correo real, la contraseña con la que van a entrar y **Auto Confirm User** marcado. Para cambiar una contraseña después: Users → el usuario → *Reset password* o *Update password*.
+5. **Variables de entorno** (ver `.env.example`):
 
    | Dónde | Variable | Valor |
    |---|---|---|
@@ -117,7 +109,7 @@ La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la ba
    | `.env.local` y Vercel | `VITE_SUPABASE_ANON_KEY` | Project Settings → API → anon public |
    | `.env.local` y Vercel | `VITE_ACCOUNTS` | `Miguel:correo1,Karen:correo2` (los mismos correos del paso 4) |
 
-   Sin las dos `VITE_SUPABASE_*` la sección *Cuenta* no aparece y la app funciona solo en local, como antes.
+   Sin las dos `VITE_SUPABASE_*` no hay pantalla de inicio de sesión y la app funciona solo en local, como antes.
 
 ## Notificaciones
 
@@ -216,7 +208,8 @@ src/
     ScheduleScreen        Cronograma del día
     TodosScreen           Lista de pendientes
     ReportScreen          Reporte de constancia y rachas
-    SettingsScreen        Temas, notificaciones, importar/exportar
+    LoginScreen           Pantalla de entrada (nombre + contraseña)
+    SettingsScreen        Cuenta, temas, notificaciones, importar/exportar
   components/             WeekStrip, DayModeBar, TaskCard, TaskEditor, TimePicker,
                           IconPicker, ScopeDialog, TodoRow, TabBar, StreakCalendar,
                           ProgressRing, EmptyState
@@ -224,7 +217,7 @@ src/
                           importación JSON, modos de día (dayModes.ts) y
                           sincronización con Supabase (cloud.ts, syncQueue.ts,
                           useCloudSync.ts)
-  auth/                   Sesión de Supabase (código por correo)
+  auth/                   Sesión de Supabase (correo + contraseña)
   lib/supabase.ts         Cliente de Supabase del navegador
   theme/                  Tokens, paletas de color, categorías, catálogo de iconos
                           y el componente Ionicons (fuente + glyph map)

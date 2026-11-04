@@ -21,7 +21,7 @@ import {
   parseBackup,
   parseImport,
 } from '../storage/importExport';
-import { ACCOUNTS, accountFor } from '../auth/accounts';
+import { accountFor } from '../auth/accounts';
 import { useAuth } from '../auth/AuthProvider';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import type { CloudSync } from '../storage/useCloudSync';
@@ -132,8 +132,6 @@ function since(ms: number | null): string {
   return h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} d`;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const IMPORT_CONTEXTS: { value: TaskContext; label: string }[] = [
   { value: 'any', label: 'Cualquier día' },
   { value: 'city', label: 'Ciudad' },
@@ -154,9 +152,6 @@ export function SettingsScreen({
   const insets = useSafeAreaInsets();
   const auth = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
 
   const [sound, setSound] = useState(isSoundEnabled());
@@ -166,57 +161,11 @@ export function SettingsScreen({
   const [feedback, setFeedback] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null);
   const [pendingClear, setPendingClear] = useState<ClearKind | null>(null);
 
-  const handleRequestCode = useCallback(async (chosen?: string) => {
-    const value = (chosen ?? email).trim();
-    if (chosen) setEmail(chosen);
-    if (!EMAIL_RE.test(value)) {
-      setFeedback({ tone: 'error', message: 'Escribe un correo válido.' });
-      return;
-    }
-    void Haptics.selectionAsync();
-    setAuthBusy(true);
-    const result = await auth.requestCode(value);
-    setAuthBusy(false);
-    if (result.ok) {
-      setCodeSent(true);
-      setFeedback({ tone: 'ok', message: `Te enviamos un código a ${value}. Revisa también spam.` });
-    } else {
-      setFeedback({ tone: 'error', message: result.error });
-    }
-  }, [auth, email]);
-
-  const handleVerifyCode = useCallback(async () => {
-    if (code.replace(/\s+/g, '').length < 6) {
-      setFeedback({ tone: 'error', message: 'El código tiene 6 dígitos.' });
-      return;
-    }
-    void Haptics.selectionAsync();
-    setAuthBusy(true);
-    const result = await auth.verifyCode(email, code);
-    setAuthBusy(false);
-    if (result.ok) {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setCode('');
-      setCodeSent(false);
-      setFeedback({
-        tone: 'ok',
-        message: 'Sesión iniciada. Lo que tenías en este dispositivo se está subiendo a tu cuenta.',
-      });
-    } else {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setFeedback({ tone: 'error', message: result.error });
-    }
-  }, [auth, email, code]);
-
   const handleSignOut = useCallback(async () => {
     void Haptics.selectionAsync();
     setAuthBusy(true);
     await auth.signOut();
     setAuthBusy(false);
-    setFeedback({
-      tone: 'ok',
-      message: 'Sesión cerrada. Tus datos siguen en este dispositivo y en tu cuenta.',
-    });
   }, [auth]);
 
   const [armed, setArmed] = useState(0);
@@ -452,205 +401,71 @@ export function SettingsScreen({
       <Text style={[styles.screenTitle, { color: colors.foreground }]}>Ajustes</Text>
 
       {/* ---- Account & sync ---- */}
-      {auth.configured ? (
+      {auth.configured && auth.user ? (
         <View style={card}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Cuenta</Text>
-          {auth.user ? (
-            <>
-              <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
-                {accountFor(auth.user.email)
-                  ? `${accountFor(auth.user.email)?.name} · ${auth.user.email}`
-                  : auth.user.email}
+          <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
+            {accountFor(auth.user.email)
+              ? `${accountFor(auth.user.email)?.name} · ${auth.user.email}`
+              : auth.user.email}
+          </Text>
+          <View style={[styles.statusRow, { borderColor: colors.border }]}>
+            <Ionicons
+              name={
+                cloud.error
+                  ? 'alert-circle-outline'
+                  : cloud.syncing
+                    ? 'sync-outline'
+                    : 'cloud-done-outline'
+              }
+              size={16}
+              color={cloud.error ? colors.destructive : colors.accent}
+            />
+            <Text style={[styles.cardHint, { color: colors.mutedForeground, flex: 1 }]}>
+              {cloud.error
+                ? cloud.error
+                : cloud.syncing
+                  ? 'Sincronizando…'
+                  : cloud.pending > 0
+                    ? `${cloud.pending} ${cloud.pending === 1 ? 'cambio pendiente' : 'cambios pendientes'} de subir.`
+                    : `Todo sincronizado · ${since(cloud.lastSyncAt)}.`}
+            </Text>
+          </View>
+          <View style={styles.btnRow}>
+            <Pressable
+              onPress={() => {
+                void Haptics.selectionAsync();
+                void cloud.syncNow();
+              }}
+              disabled={cloud.syncing}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                styles.flexBtn,
+                { borderColor: colors.border, opacity: cloud.syncing ? 0.5 : pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Ionicons name="sync-outline" size={16} color={colors.foreground} />
+              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                Sincronizar
               </Text>
-              <View style={[styles.statusRow, { borderColor: colors.border }]}>
-                <Ionicons
-                  name={
-                    cloud.error
-                      ? 'alert-circle-outline'
-                      : cloud.syncing
-                        ? 'sync-outline'
-                        : 'cloud-done-outline'
-                  }
-                  size={16}
-                  color={cloud.error ? colors.destructive : colors.accent}
-                />
-                <Text style={[styles.cardHint, { color: colors.mutedForeground, flex: 1 }]}>
-                  {cloud.error
-                    ? cloud.error
-                    : cloud.syncing
-                      ? 'Sincronizando…'
-                      : cloud.pending > 0
-                        ? `${cloud.pending} ${cloud.pending === 1 ? 'cambio pendiente' : 'cambios pendientes'} de subir.`
-                        : `Todo sincronizado · ${since(cloud.lastSyncAt)}.`}
-                </Text>
-              </View>
-              <View style={styles.btnRow}>
-                <Pressable
-                  onPress={() => {
-                    void Haptics.selectionAsync();
-                    void cloud.syncNow();
-                  }}
-                  disabled={cloud.syncing}
-                  accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.secondaryBtn,
-                    styles.flexBtn,
-                    { borderColor: colors.border, opacity: cloud.syncing ? 0.5 : pressed ? 0.7 : 1 },
-                  ]}
-                >
-                  <Ionicons name="sync-outline" size={16} color={colors.foreground} />
-                  <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
-                    Sincronizar
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleSignOut}
-                  disabled={authBusy}
-                  accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.secondaryBtn,
-                    styles.flexBtn,
-                    { borderColor: colors.border, opacity: authBusy ? 0.5 : pressed ? 0.7 : 1 },
-                  ]}
-                >
-                  <Ionicons name="log-out-outline" size={16} color={colors.foreground} />
-                  <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
-                    Cerrar sesión
-                  </Text>
-                </Pressable>
-              </View>
-            </>
-          ) : (
-            <>
-              <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
-                {ACCOUNTS.length > 0
-                  ? 'Toca tu nombre y te llega un código al correo. Sin contraseña.'
-                  : 'Inicia sesión para guardar tu cronograma en la nube y verlo en cualquier dispositivo. Sin contraseña: te llega un código al correo.'}
+            </Pressable>
+            <Pressable
+              onPress={handleSignOut}
+              disabled={authBusy}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.secondaryBtn,
+                styles.flexBtn,
+                { borderColor: colors.border, opacity: authBusy ? 0.5 : pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Ionicons name="log-out-outline" size={16} color={colors.foreground} />
+              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                Cerrar sesión
               </Text>
-              {ACCOUNTS.length > 0 && !codeSent ? (
-                <View style={styles.btnRow}>
-                  {ACCOUNTS.map((account) => (
-                    <Pressable
-                      key={account.email}
-                      onPress={() => void handleRequestCode(account.email)}
-                      disabled={authBusy}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Entrar como ${account.name}`}
-                      style={({ pressed }) => [
-                        styles.primaryBtn,
-                        styles.flexBtn,
-                        {
-                          backgroundColor: colors.primary,
-                          opacity: authBusy ? 0.5 : pressed ? 0.85 : 1,
-                        },
-                      ]}
-                    >
-                      <Ionicons name="person-circle-outline" size={18} color={colors.onPrimary} />
-                      <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
-                        {account.name}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                editable={!codeSent && !authBusy}
-                placeholder="tu@correo.com"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                textContentType="emailAddress"
-                accessibilityLabel="Correo"
-                style={[
-                  styles.input,
-                  {
-                    color: colors.foreground,
-                    borderColor: colors.border,
-                    backgroundColor: colors.muted,
-                    opacity: codeSent ? 0.6 : 1,
-                    display: ACCOUNTS.length > 0 && !codeSent ? 'none' : 'flex',
-                  },
-                ]}
-              />
-              {codeSent ? (
-                <>
-                  <TextInput
-                    value={code}
-                    onChangeText={setCode}
-                    editable={!authBusy}
-                    placeholder="Código de 6 dígitos"
-                    placeholderTextColor={colors.mutedForeground}
-                    keyboardType="number-pad"
-                    autoComplete="sms-otp"
-                    textContentType="oneTimeCode"
-                    maxLength={8}
-                    accessibilityLabel="Código"
-                    style={[
-                      styles.input,
-                      {
-                        color: colors.foreground,
-                        borderColor: colors.border,
-                        backgroundColor: colors.muted,
-                      },
-                    ]}
-                  />
-                  <Pressable
-                    onPress={handleVerifyCode}
-                    disabled={authBusy}
-                    accessibilityRole="button"
-                    style={({ pressed }) => [
-                      styles.primaryBtn,
-                      {
-                        backgroundColor: colors.primary,
-                        opacity: authBusy ? 0.5 : pressed ? 0.85 : 1,
-                      },
-                    ]}
-                  >
-                    <Ionicons name="log-in-outline" size={18} color={colors.onPrimary} />
-                    <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>Entrar</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setCodeSent(false);
-                      setCode('');
-                    }}
-                    disabled={authBusy}
-                    accessibilityRole="button"
-                    style={({ pressed }) => [
-                      styles.secondaryBtn,
-                      { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-                    ]}
-                  >
-                    <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
-                      Cambiar correo o pedir otro código
-                    </Text>
-                  </Pressable>
-                </>
-              ) : ACCOUNTS.length > 0 ? null : (
-                <Pressable
-                  onPress={() => void handleRequestCode()}
-                  disabled={authBusy}
-                  accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.primaryBtn,
-                    {
-                      backgroundColor: colors.primary,
-                      opacity: authBusy ? 0.5 : pressed ? 0.85 : 1,
-                    },
-                  ]}
-                >
-                  <Ionicons name="mail-outline" size={18} color={colors.onPrimary} />
-                  <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
-                    Enviarme un código
-                  </Text>
-                </Pressable>
-              )}
-            </>
-          )}
+            </Pressable>
+          </View>
         </View>
       ) : null}
 

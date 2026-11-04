@@ -6,24 +6,20 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase';
 /**
  * Session state for the whole app.
  *
- * Sign-in is a two-step e-mail code: request a code, type it in. No password,
- * no OAuth redirect, so it works the same in a Safari tab and in the installed
- * PWA. Sign-up is closed: the accounts are created by hand in Supabase and a
- * code is only ever sent to one of them.
+ * Sign-in is e-mail + password, done once per device: the session lives in
+ * localStorage and refreshes itself, so the login screen only shows up again
+ * after signing out. Sign-up is closed: the accounts are created by hand in
+ * Supabase and nothing in the app can create one.
  */
 
 type AuthValue = {
-  /** False when the Supabase variables are missing; the UI hides the account section. */
+  /** False when the Supabase variables are missing; the app then runs offline-only. */
   configured: boolean;
   /** True until the stored session (if any) has been read. */
   loading: boolean;
   session: Session | null;
   user: User | null;
-  requestCode: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>;
-  verifyCode: (
-    email: string,
-    code: string,
-  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  signIn: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   signOut: () => Promise<void>;
 };
 
@@ -31,9 +27,9 @@ const AuthContext = createContext<AuthValue | null>(null);
 
 function describe(error: { message?: string } | null | undefined): string {
   const m = error?.message ?? '';
-  if (/signups? not allowed|user not found/i.test(m)) return 'Ese correo no tiene cuenta en day2day.';
-  if (/rate limit/i.test(m)) return 'Demasiados intentos. Espera un minuto y vuelve a probar.';
-  if (/expired|invalid/i.test(m)) return 'Código incorrecto o vencido. Pide uno nuevo.';
+  if (/invalid login credentials|invalid_credentials/i.test(m)) return 'Correo o contraseña incorrectos.';
+  if (/email not confirmed/i.test(m)) return 'Esa cuenta no está confirmada en Supabase.';
+  if (/rate limit|too many/i.test(m)) return 'Demasiados intentos. Espera un minuto y vuelve a probar.';
   if (/network|fetch/i.test(m)) return 'Sin conexión con el servidor.';
   return m || 'Algo falló. Inténtalo de nuevo.';
 }
@@ -63,22 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const requestCode = useCallback<AuthValue['requestCode']>(async (email) => {
+  const signIn = useCallback<AuthValue['signIn']>(async (email, password) => {
     if (!supabase) return { ok: false, error: 'La cuenta no está configurada en esta build.' };
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
-      // Sign-up is closed: only the accounts created in Supabase can get a code.
-      options: { shouldCreateUser: false },
-    });
-    return error ? { ok: false, error: describe(error) } : { ok: true };
-  }, []);
-
-  const verifyCode = useCallback<AuthValue['verifyCode']>(async (email, code) => {
-    if (!supabase) return { ok: false, error: 'La cuenta no está configurada en esta build.' };
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token: code.replace(/\s+/g, ''),
-      type: 'email',
+      password,
     });
     return error ? { ok: false, error: describe(error) } : { ok: true };
   }, []);
@@ -94,11 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       session,
       user: session?.user ?? null,
-      requestCode,
-      verifyCode,
+      signIn,
       signOut,
     }),
-    [loading, session, requestCode, verifyCode, signOut],
+    [loading, session, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

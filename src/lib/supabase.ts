@@ -7,9 +7,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  * the session: it survives the installed app being closed, and it is per
  * origin, so a session never leaks between sites.
  *
- * Sign-in is by e-mailed code, not by magic link: on iOS a link opens in Safari
- * rather than in the installed app, which would leave the app itself logged
- * out. With a code there is no URL to detect, hence `detectSessionInUrl: false`.
+ * Sign-in is e-mail + password, never a magic link: on iOS a link opens in
+ * Safari rather than in the installed app, which would leave the app itself
+ * logged out. There is no URL to detect, hence `detectSessionInUrl: false`.
  *
  * The client is optional: without the two public variables the app keeps
  * working offline-only, exactly as before the database existed.
