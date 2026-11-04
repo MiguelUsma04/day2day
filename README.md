@@ -90,7 +90,7 @@ La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la ba
 
 - **Entrar**: pantalla de inicio → tocar *Miguel* o *Karen* → contraseña. Una vez por dispositivo: la sesión se guarda en `localStorage` y se renueva sola hasta que se cierra desde Ajustes → Cuenta. Sin enlaces mágicos: en iPhone abrirían Safari y no la app instalada.
 - **Solo esas cuentas**: el registro está cerrado (*Allow new users to sign up* apagado en Supabase). Los nombres y correos salen de `VITE_ACCOUNTS`; si no está definida, la app muestra un campo de correo normal.
-- **Qué se sincroniza**: actividades (con historial, overrides y días saltados), pendientes (con su orden) y los días marcados como finca o festivo. Los ajustes de tema y sonido son por dispositivo.
+- **Qué se sincroniza**: actividades (con historial, overrides y días saltados), pendientes (con su orden), los días marcados como finca o festivo, y el tema de color con el modo claro/oscuro (van en los metadatos del usuario de Supabase Auth, no en una tabla). El sonido y los avisos push son por dispositivo.
 - **Cómo**: cada cambio local entra en una cola persistida (`day2day:syncQueue:v1`) y se sube con un pequeño retraso; al abrir la app, al volver a primer plano y al recuperar la red se hace un *pull* incremental por `synced_at` (reloj del servidor). En un conflicto gana el `updatedAt` más reciente; un borrado gana a una edición anterior. Los borrados son lógicos (`deleted_at`) para que lleguen a los demás dispositivos.
 - **Primer inicio de sesión**: lo que solo existe en el dispositivo se sube; lo que solo existe en la cuenta se baja.
 - **Cerrar sesión** no borra nada: el dispositivo conserva su copia.
