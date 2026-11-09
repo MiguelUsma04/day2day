@@ -14,7 +14,7 @@ import { addDays, fromDayKey, toDayKey } from '../utils/date';
 import { createId } from '../utils/id';
 import { COLLECTIONS } from './collections';
 import { resolveDayMode, toDayModeMap } from './dayModes';
-import { occursOn } from './occurrence';
+import { byOrder, markedDaysOf, tasksForDay, todosForDay } from './dayView';
 import {
   loadDayModes,
   loadTasks,
@@ -30,40 +30,6 @@ import { useCloudSync, type CloudSync } from './useCloudSync';
 
 /** Gap left between items when one lands at either end of the list. */
 const ORDER_STEP = 1000;
-
-function byOrder(a: Todo, b: Todo): number {
-  return a.order - b.order || a.createdAt - b.createdAt;
-}
-
-/**
- * Scheduled entries sort by start time; unscheduled ones trail in creation order.
- *
- * Completed entries drop below the pending ones, so what is left to do stays at
- * the top of the day instead of being buried under what is already done.
- */
-function sortInstances(items: TaskInstance[]): TaskInstance[] {
-  return [...items].sort((a, b) => {
-    if (a.done !== b.done) return a.done ? 1 : -1;
-    if (a.startMinutes === null && b.startMinutes === null) return a.createdAt - b.createdAt;
-    if (a.startMinutes === null) return 1;
-    if (b.startMinutes === null) return -1;
-    if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
-    return a.createdAt - b.createdAt;
-  });
-}
-
-/** Applies any per-day override on top of the stored task. */
-function resolve(task: Task, dayKey: string): TaskInstance {
-  const override = task.overrides[dayKey];
-  return {
-    ...task,
-    ...(override ?? {}),
-    dayKey,
-    done: task.completedDays.includes(dayKey),
-    isRepeating: task.repeat.kind !== 'none',
-    hasOverride: override !== undefined,
-  };
-}
 
 /**
  * Stamps `updatedAt` on every record the updater replaced.
@@ -291,10 +257,7 @@ export function useTasks(userId: string | null) {
   );
 
   const getTasksForDay = useCallback(
-    (dayKey: string): TaskInstance[] =>
-      sortInstances(
-        tasks.filter((t) => occursOn(t, dayKey, dayModes)).map((t) => resolve(t, dayKey)),
-      ),
+    (dayKey: string): TaskInstance[] => tasksForDay(tasks, dayModes, dayKey),
     [tasks, dayModes],
   );
 
@@ -331,14 +294,7 @@ export function useTasks(userId: string | null) {
   );
 
   /** Day keys that should show a dot in the week strip. */
-  const markedDays = useMemo(() => {
-    const keys = new Set<string>();
-    for (const task of tasks) {
-      if (task.repeat.kind === 'none') keys.add(task.date);
-    }
-    for (const todo of todos) keys.add(todo.date);
-    return keys;
-  }, [tasks, todos]);
+  const markedDays = useMemo(() => markedDaysOf(tasks, todos), [tasks, todos]);
 
   const addTodo = useCallback(
     (title: string, date: string) => {
@@ -458,11 +414,7 @@ export function useTasks(userId: string | null) {
   );
 
   const getTodosForDay = useCallback(
-    (dayKey: string) =>
-      todos
-        .filter((t) => t.date === dayKey)
-        // Done items sink, matching how the schedule orders itself.
-        .sort((a, b) => (a.done !== b.done ? (a.done ? 1 : -1) : byOrder(a, b))),
+    (dayKey: string) => todosForDay(todos, dayKey),
     [todos],
   );
 

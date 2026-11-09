@@ -40,11 +40,21 @@ type Props = {
   dayKey: string;
   mode: ResolvedDayMode;
   onChange: (mode: DayMode | null) => void;
+  /** Someone else's day: show how it is spent, without the controls. */
+  readOnly?: boolean;
 };
 
-export function DayModeBar({ dayKey, mode, onChange }: Props) {
+export function DayModeBar({ dayKey, mode, onChange, readOnly = false }: Props) {
   const { colors } = useTheme();
   const weekend = isWeekend(dayKey);
+
+  if (readOnly) {
+    return (
+      <View style={styles.row}>
+        <Text style={[styles.caption, { color: colors.mutedForeground }]}>{DAY_MODE_LABEL[mode]}</Text>
+      </View>
+    );
+  }
   // A weekend can also be a holiday in the data (e.g. synced from an older
   // mark); show it as its own choice so the state is never hidden.
   const options =

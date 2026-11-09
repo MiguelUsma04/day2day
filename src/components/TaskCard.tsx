@@ -25,9 +25,11 @@ type Props = {
   onDelete: (task: TaskInstance) => void;
   /** Highlights the block covering the current moment. */
   isCurrent?: boolean;
+  /** Someone else's day: no swipes, no completing, no editing. */
+  readOnly?: boolean;
 };
 
-export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false }: Props) {
+export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false, readOnly = false }: Props) {
   const { colors, isDark } = useTheme();
   const meta = categoryMeta[task.category];
   const icon = (task.icon as IconName | undefined) ?? meta.icon;
@@ -68,6 +70,7 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
   }, [task, onDelete]);
 
   const pan = Gesture.Pan()
+    .enabled(!readOnly)
     .activeOffsetX([-ACTIVATION, ACTIVATION])
     // Keeps the vertical list scroll from being stolen by a near-vertical drag.
     .failOffsetY([-14, 14])
@@ -215,9 +218,14 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
         <Animated.View style={{ transform: [{ translateX }] }}>
           <Pressable
             onPress={handlePress}
+            disabled={readOnly}
             accessibilityRole="button"
             accessibilityLabel={`${task.title}${task.done ? ', completada' : ''}`}
-            accessibilityHint="Toca para editar. Desliza a la derecha para completar, a la izquierda para eliminar."
+            accessibilityHint={
+              readOnly
+                ? undefined
+                : 'Toca para editar. Desliza a la derecha para completar, a la izquierda para eliminar.'
+            }
             onPressIn={() => {
               // Ignore the delayed press-in that arrives after a drag began.
               if (moved.current) return;
@@ -297,9 +305,10 @@ export function TaskCard({ task, onToggle, onPress, onDelete, isCurrent = false 
 
             <Pressable
               onPress={complete}
+              disabled={readOnly}
               hitSlop={10}
               accessibilityRole="checkbox"
-              accessibilityState={{ checked: task.done }}
+              accessibilityState={{ checked: task.done, disabled: readOnly }}
               accessibilityLabel={task.done ? 'Marcar como pendiente' : 'Marcar como completada'}
               style={({ pressed }) => [
                 styles.checkbox,
