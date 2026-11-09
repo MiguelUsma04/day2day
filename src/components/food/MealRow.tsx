@@ -57,7 +57,8 @@ export function MealRow({ meal, onPress, onDelete, readOnly = false }: Props) {
     })
     .onUpdate((event) => {
       const x = Math.min(0, event.translationX);
-      if (Math.abs(x) > 4) swiping.current = true;
+      // Raw translation, not the clamped one: a rightward drag must also swallow the tap that follows.
+      if (Math.abs(event.translationX) > 4) swiping.current = true;
       translateX.setValue(x);
       if (!committed.current && -x >= THRESHOLD) {
         committed.current = true;
