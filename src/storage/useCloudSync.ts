@@ -2,20 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { isSupabaseConfigured } from '../lib/supabase';
-import type { DayModeRecord, Task, Todo } from '../types/task';
-import {
-  fetchChanges,
-  fromDayModeRow,
-  fromTaskRow,
-  fromTodoRow,
-  softDeleteRows,
-  toDayModeRow,
-  toTaskRow,
-  toTodoRow,
-  upsertDayModeRows,
-  upsertTaskRows,
-  upsertTodoRows,
-} from './cloud';
+import { fetchChanges, softDeleteRows, upsertRows } from './cloud';
+import type { CollectionDef } from './collections';
 import {
   dequeue,
   enqueue,
@@ -24,8 +12,8 @@ import {
   pendingCount,
   snapshot,
   type QueueOp,
-  type Table,
 } from './syncQueue';
+import type { Rec, Row, Table } from './tables';
 
 /**
  * Two-way sync between the in-memory store and Supabase.
@@ -44,8 +32,10 @@ import {
  * Records applied from the server are remembered so step 1 does not mistake
  * them for local edits and echo them straight back.
  *
- * Three collections go through the same machinery: tasks, todos and day
- * modes. Each is described once in `COLLECTIONS` below.
+ * Every collection goes through the same machinery. The caller passes one
+ * `Binding` per collection (its `CollectionDef` from `COLLECTIONS` plus its
+ * state and raw setter); the number of bindings must not change between
+ * renders of the same caller.
  */
 
 export type CloudSync = {
@@ -60,24 +50,23 @@ export type CloudSync = {
   syncNow: () => Promise<void>;
 };
 
-type Setter<T> = React.Dispatch<React.SetStateAction<T[]>>;
+/** One collection wired into the sync: what it is, its current state, and how to replace it. */
+export type Binding<T extends Rec, R extends Row> = {
+  def: CollectionDef<T, R>;
+  items: T[];
+  /** Raw setter: records from the server already carry their own `updatedAt`. */
+  setItems: (updater: (prev: T[]) => T[]) => void;
+};
 
 type Args = {
   userId: string | null;
   ready: boolean;
-  tasks: Task[];
-  todos: Todo[];
-  dayModes: DayModeRecord[];
-  setTasks: Setter<Task>;
-  setTodos: Setter<Todo>;
-  setDayModes: Setter<DayModeRecord>;
+  // `any` because each binding has its own record/row pair; its def ties them together.
+  bindings: Binding<any, any>[];
 };
 
 const CURSOR_KEY = 'day2day:syncCursor:v1';
 const FLUSH_DELAY_MS = 800;
-
-type Rec = { id: string; updatedAt: number };
-type Row = { id: string; updated_at: number; deleted_at: number | null };
 
 /** Per-collection bookkeeping: last seen state, and what came from the server. */
 type Tracker<T extends Rec> = {
@@ -214,13 +203,12 @@ function groupDeletes(list: Array<[string, QueueOp]>): Map<number, string[]> {
 }
 
 /** Uploads one collection's queue: upserts, then deletes; returns what to dequeue. */
-async function flushTable<T extends Rec, R>(
-  table: Table,
+async function flushTable<T extends Rec, R extends Row>(
+  def: CollectionDef<T, R>,
   uid: string,
   current: Map<string, T>,
-  toRow: (item: T, uid: string) => R,
-  upsert: (rows: R[]) => Promise<void>,
 ): Promise<Array<[Table, string, QueueOp]>> {
+  const { table } = def;
   const ops = snapshot(table);
   if (ops.length === 0) return [];
   const rows: R[] = [];
@@ -231,42 +219,35 @@ async function flushTable<T extends Rec, R>(
     if (op.op === 'upsert') {
       const item = current.get(id);
       // Queued but gone from state: a delete will follow or already did.
-      if (item) rows.push(toRow(item, uid));
+      if (item) rows.push(def.toRow(item, uid));
     } else deletes.push([id, op]);
     done.push([table, id, op]);
   }
 
-  await upsert(rows);
-  for (const [at, ids] of groupDeletes(deletes)) await softDeleteRows(table, ids, at);
+  await upsertRows(table, rows, def.onConflict);
+  for (const [at, ids] of groupDeletes(deletes)) await softDeleteRows(table, ids, at, uid);
   return done;
 }
 
-export function useCloudSync({
-  userId,
-  ready,
-  tasks,
-  todos,
-  dayModes,
-  setTasks,
-  setTodos,
-  setDayModes,
-}: Args): CloudSync {
+export function useCloudSync({ userId, ready, bindings }: Args): CloudSync {
   const [syncing, setSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingN, setPendingN] = useState(0);
 
-  const taskT = useRef(tracker<Task>());
-  const todoT = useRef(tracker<Todo>());
-  const modeT = useRef(tracker<DayModeRecord>());
+  const trackers = useRef(new Map<Table, Tracker<Rec>>());
+  const trackerFor = (table: Table): Tracker<Rec> => {
+    let t = trackers.current.get(table);
+    if (!t) {
+      t = tracker<Rec>();
+      trackers.current.set(table, t);
+    }
+    return t;
+  };
 
-  // Latest state, for the flush to read without being re-created on every change.
-  const tasksRef = useRef(tasks);
-  const todosRef = useRef(todos);
-  const modesRef = useRef(dayModes);
-  tasksRef.current = tasks;
-  todosRef.current = todos;
-  modesRef.current = dayModes;
+  // Latest bindings, for the flush and pull to read without being re-created on every change.
+  const bindingsRef = useRef(bindings);
+  bindingsRef.current = bindings;
 
   const userRef = useRef(userId);
   userRef.current = userId;
@@ -275,29 +256,17 @@ export function useCloudSync({
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- 1. diff local changes into the queue --------------------------------
+  // One effect for every collection: the deps are each binding's state, and the
+  // caller keeps the number of bindings fixed, so the array length is stable.
+  // Diffing an unchanged list is a no-op (every item is identical to the last
+  // seen one), so re-running for a sibling's change queues nothing extra.
   useEffect(() => {
     if (!ready) return;
-    diffAndQueue('tasks', taskT.current, tasks);
+    for (const b of bindings) diffAndQueue(b.def.table, trackerFor(b.def.table), b.items);
     setPendingN(pendingCount());
     scheduleFlush();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-    diffAndQueue('todos', todoT.current, todos);
-    setPendingN(pendingCount());
-    scheduleFlush();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todos, ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-    diffAndQueue('day_modes', modeT.current, dayModes);
-    setPendingN(pendingCount());
-    scheduleFlush();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayModes, ready]);
+  }, [ready, ...bindings.map((b) => b.items)]);
 
   // ---- 2. flush the queue --------------------------------------------------
   const flush = useCallback(async () => {
@@ -305,18 +274,11 @@ export function useCloudSync({
     if (!uid || !isSupabaseConfigured) return;
     await loadQueue();
 
-    const byId = <T extends Rec>(list: T[]) => new Map(list.map((t) => [t.id, t]));
-    const done = [
-      ...(await flushTable('tasks', uid, byId(tasksRef.current), toTaskRow, upsertTaskRows)),
-      ...(await flushTable('todos', uid, byId(todosRef.current), toTodoRow, upsertTodoRows)),
-      ...(await flushTable(
-        'day_modes',
-        uid,
-        byId(modesRef.current),
-        toDayModeRow,
-        upsertDayModeRows,
-      )),
-    ];
+    const done: Array<[Table, string, QueueOp]> = [];
+    for (const b of bindingsRef.current) {
+      const current = new Map<string, Rec>(b.items.map((item: Rec) => [item.id, item]));
+      done.push(...(await flushTable(b.def, uid, current)));
+    }
     for (const [table, id, op] of done) dequeue(table, id, op);
   }, []);
 
@@ -329,33 +291,25 @@ export function useCloudSync({
     const since = await AsyncStorage.getItem(cursorKey).catch(() => null);
     const firstPull = since === null;
 
-    const changes = await fetchChanges(since);
+    const list = bindingsRef.current;
+    const changes = await fetchChanges(
+      since,
+      uid,
+      list.map((b) => b.def.table),
+    );
 
     // Functional updates, so an edit that landed while the fetch was in flight
     // is merged against, not overwritten. The bookkeeping side effects are
     // idempotent, which keeps a double-invoked updater (StrictMode) harmless.
-    setTasks((prev) => {
-      const r = merge('tasks', taskT.current, prev, changes.tasks, fromTaskRow, firstPull);
-      for (const id of r.upload) enqueue('tasks', id, { op: 'upsert' });
-      return r.next;
-    });
-    setTodos((prev) => {
-      const r = merge('todos', todoT.current, prev, changes.todos, fromTodoRow, firstPull);
-      for (const id of r.upload) enqueue('todos', id, { op: 'upsert' });
-      return r.next;
-    });
-    setDayModes((prev) => {
-      const r = merge(
-        'day_modes',
-        modeT.current,
-        prev,
-        changes.dayModes,
-        fromDayModeRow,
-        firstPull,
-      );
-      for (const id of r.upload) enqueue('day_modes', id, { op: 'upsert' });
-      return r.next;
-    });
+    for (const b of list) {
+      const { table, fromRow } = b.def;
+      const rows = changes.rows[table] ?? [];
+      b.setItems((prev: Rec[]) => {
+        const r = merge(table, trackerFor(table), prev, rows, fromRow, firstPull);
+        for (const id of r.upload) enqueue(table, id, { op: 'upsert' });
+        return r.next;
+      });
+    }
 
     if (changes.cursor) await AsyncStorage.setItem(cursorKey, changes.cursor).catch(() => {});
     else if (firstPull) {
@@ -363,7 +317,8 @@ export function useCloudSync({
       // oldest possible cursor, so the next pull is incremental.
       await AsyncStorage.setItem(cursorKey, new Date(0).toISOString()).catch(() => {});
     }
-  }, [setTasks, setTodos, setDayModes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Full cycle, serialised: a second call while one runs waits for it. */
   const syncNow = useCallback(async () => {

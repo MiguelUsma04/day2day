@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { supabase } from '../lib/supabase';
 import {
   NO_REPEAT,
@@ -8,16 +10,32 @@ import {
   type Weekday,
 } from '../types/task';
 import { normalizeDayMode, normalizeTask, normalizeTodo } from './tasks';
+import type { Row, Table } from './tables';
 
 /**
- * Talks to the two user tables in Supabase.
+ * Talks to the per-user tables in Supabase.
  *
  * Rows mirror the local types with snake_case names. Deletion is soft
  * (`deleted_at`), so another device learns about it on its next pull instead of
  * silently keeping a ghost. `synced_at` is the server clock and only serves as
  * the pull cursor; who wins a conflict is decided by the client-side
  * `updated_at`, which is what the user actually experienced as "later".
+ *
+ * Every read and soft delete is scoped to the signed-in user explicitly rather
+ * than leaning on RLS alone: RLS also lets each account read its partner's
+ * rows, which must never be pulled into this device's own store.
  */
+
+let clientOverride: SupabaseClient | null = null;
+
+/** Test hook: route every call through `client` instead of the real one; `null` restores it. */
+export function __setClientForTests(client: SupabaseClient | null): void {
+  clientOverride = client;
+}
+
+function db(): SupabaseClient | null {
+  return clientOverride ?? supabase;
+}
 
 export type TaskRow = {
   id: string;
@@ -172,88 +190,83 @@ export function fromDayModeRow(row: DayModeRow): DayModeRecord | null {
 }
 
 export type Changes = {
-  tasks: TaskRow[];
-  todos: TodoRow[];
-  dayModes: DayModeRow[];
+  /** Rows per table; only the tables asked for are filled. */
+  rows: Record<Table, Row[]>;
   cursor: string | null;
 };
 
 /**
- * Everything that changed on the server after `since` (an ISO timestamp from a
- * previous pull), deleted rows included. `null` means "everything".
+ * Everything of `uid`'s that changed on the server after `since` (an ISO
+ * timestamp from a previous pull) in the given tables, deleted rows included.
+ * `null` means "everything".
  */
-export async function fetchChanges(since: string | null): Promise<Changes> {
-  if (!supabase) throw new Error('Supabase no configurado');
+export async function fetchChanges(
+  since: string | null,
+  uid: string,
+  tables: readonly Table[],
+): Promise<Changes> {
+  const client = db();
+  if (!client) throw new Error('Supabase no configurado');
 
-  const query = (table: 'tasks' | 'todos' | 'day_modes') => {
-    let q = supabase!.from(table).select('*').order('synced_at', { ascending: true });
+  const query = (table: Table) => {
+    let q = client
+      .from(table)
+      .select('*')
+      .order('synced_at', { ascending: true })
+      .eq('user_id', uid);
     if (since) q = q.gt('synced_at', since);
     return q;
   };
 
-  const [tasksRes, todosRes, modesRes] = await Promise.all([
-    query('tasks'),
-    query('todos'),
-    query('day_modes'),
-  ]);
-  if (tasksRes.error) throw tasksRes.error;
-  if (todosRes.error) throw todosRes.error;
-  if (modesRes.error) throw modesRes.error;
-
-  const tasks = (tasksRes.data ?? []) as TaskRow[];
-  const todos = (todosRes.data ?? []) as TodoRow[];
-  const dayModes = (modesRes.data ?? []) as DayModeRow[];
-
+  const results = await Promise.all(tables.map((table) => query(table)));
+  const rows = {} as Record<Table, Row[]>;
   // The newest server timestamp seen becomes the next cursor. Rows are ordered
   // ascending, so it is simply the last one of each list.
-  const candidates = [
-    tasks.at(-1)?.synced_at,
-    todos.at(-1)?.synced_at,
-    dayModes.at(-1)?.synced_at,
-  ].filter((v): v is string => typeof v === 'string');
+  const candidates: string[] = [];
+  tables.forEach((table, i) => {
+    const res = results[i];
+    if (res.error) throw res.error;
+    const list = (res.data ?? []) as Row[];
+    rows[table] = list;
+    const last = list.at(-1)?.synced_at;
+    if (typeof last === 'string') candidates.push(last);
+  });
   const cursor = candidates.length ? candidates.sort().at(-1)! : since;
 
-  return { tasks, todos, dayModes, cursor };
+  return { rows, cursor };
 }
 
-export async function upsertTaskRows(rows: TaskRow[]): Promise<void> {
-  if (!supabase || rows.length === 0) return;
-  const { error } = await supabase.from('tasks').upsert(rows, { onConflict: 'id' });
-  if (error) throw error;
-}
-
-export async function upsertTodoRows(rows: TodoRow[]): Promise<void> {
-  if (!supabase || rows.length === 0) return;
-  const { error } = await supabase.from('todos').upsert(rows, { onConflict: 'id' });
+/** Upserts rows into `table`, resolving conflicts on `onConflict`. */
+export async function upsertRows(table: Table, rows: Row[], onConflict: string): Promise<void> {
+  const client = db();
+  if (!client || rows.length === 0) return;
+  const { error } = await client.from(table).upsert(rows, { onConflict });
   if (!error) return;
-  // A server that predates `sort_order` (migration 20261104 not applied yet)
-  // rejects the whole batch over that one column. Keep everything else in
+  // A server that predates `todos.sort_order` (migration 20261104 not applied
+  // yet) rejects the whole batch over that one column. Keep everything else in
   // sync and let the order stay per device until the column lands.
-  if (error.code === 'PGRST204' || error.code === '42703') {
-    const legacy = rows.map(({ sort_order: _dropped, ...rest }) => rest);
-    const retry = await supabase.from('todos').upsert(legacy, { onConflict: 'id' });
+  if (table === 'todos' && (error.code === 'PGRST204' || error.code === '42703')) {
+    const legacy = (rows as TodoRow[]).map(({ sort_order: _dropped, ...rest }) => rest);
+    const retry = await client.from(table).upsert(legacy, { onConflict });
     if (retry.error) throw retry.error;
     return;
   }
   throw error;
 }
 
-export async function upsertDayModeRows(rows: DayModeRow[]): Promise<void> {
-  if (!supabase || rows.length === 0) return;
-  const { error } = await supabase.from('day_modes').upsert(rows, { onConflict: 'user_id,id' });
-  if (error) throw error;
-}
-
-/** Marks rows deleted. A row that never reached the server is simply absent, which is fine. */
+/** Marks `uid`'s rows deleted. A row that never reached the server is simply absent, which is fine. */
 export async function softDeleteRows(
-  table: 'tasks' | 'todos' | 'day_modes',
+  table: Table,
   ids: string[],
   at: number,
+  uid: string,
 ): Promise<void> {
-  if (!supabase || ids.length === 0) return;
-  const { error } = await supabase
+  const client = db();
+  if (!client || ids.length === 0) return;
+  const { error } = await client
     .from(table)
     .update({ deleted_at: at, updated_at: at })
-    .in('id', ids);
+    .in('id', ids)
+    .eq('user_id', uid);
   if (error) throw error;
 }

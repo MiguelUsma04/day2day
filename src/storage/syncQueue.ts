@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { TABLES, type Table } from './tables';
+
 /**
  * Local changes that still have to reach the server.
  *
@@ -9,13 +11,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  */
 
 export type QueueOp = { op: 'upsert' } | { op: 'delete'; at: number };
-export type Table = 'tasks' | 'todos' | 'day_modes';
 
 type Stored = Record<Table, Record<string, QueueOp>>;
 
 const KEY = 'day2day:syncQueue:v1';
 
-const queue: Stored = { tasks: {}, todos: {}, day_modes: {} };
+const queue = Object.fromEntries(TABLES.map((t) => [t, {}])) as Stored;
 let loaded = false;
 
 export async function loadQueue(): Promise<void> {
@@ -25,7 +26,8 @@ export async function loadQueue(): Promise<void> {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw) as Partial<Stored>;
-    for (const table of ['tasks', 'todos', 'day_modes'] as const) {
+    // Payloads written before a table existed simply lack its key: it stays empty.
+    for (const table of TABLES) {
       const entries = parsed[table];
       if (entries && typeof entries === 'object') {
         // Anything already queued in this session wins over the stored copy.
@@ -68,9 +70,5 @@ export function snapshot(table: Table): Array<[string, QueueOp]> {
 }
 
 export function pendingCount(): number {
-  return (
-    Object.keys(queue.tasks).length +
-    Object.keys(queue.todos).length +
-    Object.keys(queue.day_modes).length
-  );
+  return TABLES.reduce((n, table) => n + Object.keys(queue[table]).length, 0);
 }

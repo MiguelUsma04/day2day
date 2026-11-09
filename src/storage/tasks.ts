@@ -9,9 +9,9 @@ import {
   type Todo,
 } from '../types/task';
 
-const TASKS_KEY = 'day2day:tasks:v1';
-const TODOS_KEY = 'day2day:todos:v1';
-const DAY_MODES_KEY = 'day2day:dayModes:v1';
+export const TASKS_KEY = 'day2day:tasks:v1';
+export const TODOS_KEY = 'day2day:todos:v1';
+export const DAY_MODES_KEY = 'day2day:dayModes:v1';
 
 /** Fills in fields added after a record was written, so older data still loads. */
 export function normalizeTask(raw: unknown): Task | null {

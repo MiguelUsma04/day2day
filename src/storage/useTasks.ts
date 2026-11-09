@@ -11,6 +11,8 @@ import type {
   Todo,
 } from '../types/task';
 import { addDays, fromDayKey, toDayKey } from '../utils/date';
+import { createId } from '../utils/id';
+import { COLLECTIONS } from './collections';
 import { resolveDayMode, toDayModeMap } from './dayModes';
 import { occursOn } from './occurrence';
 import {
@@ -25,10 +27,6 @@ import {
   saveTodos,
 } from './tasks';
 import { useCloudSync, type CloudSync } from './useCloudSync';
-
-function createId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
-}
 
 /** Gap left between items when one lands at either end of the list. */
 const ORDER_STEP = 1000;
@@ -143,12 +141,11 @@ export function useTasks(userId: string | null) {
   const cloud: CloudSync = useCloudSync({
     userId,
     ready: !isLoading,
-    tasks,
-    todos,
-    dayModes: dayModeList,
-    setTasks: setTasksRaw,
-    setTodos: setTodosRaw,
-    setDayModes: setDayModesRaw,
+    bindings: [
+      { def: COLLECTIONS.tasks, items: tasks, setItems: setTasksRaw },
+      { def: COLLECTIONS.todos, items: todos, setItems: setTodosRaw },
+      { def: COLLECTIONS.day_modes, items: dayModeList, setItems: setDayModesRaw },
+    ],
   });
 
   // Pull when the app comes back to the foreground: that is when another
