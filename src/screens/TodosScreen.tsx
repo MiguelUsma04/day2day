@@ -39,6 +39,11 @@ type Props = {
   onMove: (id: string, deltaDays: number) => void;
   /** Drops a pending item at `index` among the day's pending items. */
   onReorder: (id: string, index: number) => void;
+  /**
+   * Someone else's list: rows cannot be ticked, renamed, moved or deleted.
+   * The composer stays, so a todo can still be added for them.
+   */
+  readOnly?: boolean;
 };
 
 /** Space between rows; part of the distance a row travels when it makes room. */
@@ -56,6 +61,7 @@ export function TodosScreen({
   onRename,
   onMove,
   onReorder,
+  readOnly = false,
 }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -276,6 +282,7 @@ export function TodosScreen({
               onDragStart={handleDragStart}
               onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
+              readOnly={readOnly}
             />
           </View>
         )}

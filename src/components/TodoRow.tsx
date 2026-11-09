@@ -33,6 +33,8 @@ type Props = {
   onDragStart?: (id: string) => void;
   onDragMove?: (id: string, dy: number) => void;
   onDragEnd?: (id: string) => void;
+  /** Someone else's list: no swipes, ticking, renaming, deleting or dragging. */
+  readOnly?: boolean;
 };
 
 export function TodoRow({
@@ -46,6 +48,7 @@ export function TodoRow({
   onDragStart,
   onDragMove,
   onDragEnd,
+  readOnly = false,
 }: Props) {
   const { colors, isDark } = useTheme();
   const [editing, setEditing] = useState(false);
@@ -176,7 +179,7 @@ export function TodoRow({
     .runOnJS(true);
 
   const pan = Gesture.Pan()
-    .enabled(!lifted)
+    .enabled(!lifted && !readOnly)
     .activeOffsetX([-ACTIVATION, ACTIVATION])
     // Keeps the vertical list scroll from being stolen by a near-vertical drag.
     .failOffsetY([-14, 14])
@@ -219,7 +222,7 @@ export function TodoRow({
     extrapolate: 'clamp',
   });
 
-  const canDrag = !todo.done && onDragStart !== undefined;
+  const canDrag = !readOnly && !todo.done && onDragStart !== undefined;
 
   return (
     <Animated.View
@@ -274,9 +277,10 @@ export function TodoRow({
           >
             <Pressable
               onPress={toggle}
+              disabled={readOnly}
               hitSlop={8}
               accessibilityRole="checkbox"
-              accessibilityState={{ checked: todo.done }}
+              accessibilityState={{ checked: todo.done, disabled: readOnly }}
               accessibilityLabel={todo.title}
               style={({ pressed: p }) => [
                 styles.checkbox,
@@ -305,6 +309,7 @@ export function TodoRow({
             ) : (
               <Pressable
                 onPress={startEdit}
+                disabled={readOnly}
                 onPressIn={() => {
                   if (moved.current) return;
                   setPressed(true);
@@ -330,15 +335,17 @@ export function TodoRow({
               </Pressable>
             )}
 
-            <Pressable
-              onPress={requestRemove}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={`Eliminar ${todo.title}`}
-              style={({ pressed: p }) => [styles.deleteBtn, { opacity: p ? 0.5 : 1 }]}
-            >
-              <Ionicons name="close" size={18} color={colors.mutedForeground} />
-            </Pressable>
+            {readOnly ? null : (
+              <Pressable
+                onPress={requestRemove}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Eliminar ${todo.title}`}
+                style={({ pressed: p }) => [styles.deleteBtn, { opacity: p ? 0.5 : 1 }]}
+              >
+                <Ionicons name="close" size={18} color={colors.mutedForeground} />
+              </Pressable>
+            )}
 
             {canDrag ? (
               <GestureDetector gesture={drag} touchAction="none">

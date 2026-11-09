@@ -34,6 +34,8 @@ type Props = {
   onUpdate: (id: string, patch: Partial<TaskDraft>, scope: EditScope, dayKey: string) => void;
   onDelete: (id: string) => void;
   onSkip: (id: string, dayKey: string) => void;
+  /** Someone else's day: nothing can be added, completed or edited. */
+  readOnly?: boolean;
 };
 
 /** A pending action waiting on the one-day / whole-series choice. */
@@ -54,6 +56,7 @@ export function ScheduleScreen({
   onUpdate,
   onDelete,
   onSkip,
+  readOnly = false,
 }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -180,7 +183,9 @@ export function ScheduleScreen({
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.titleRow}>
           <View style={styles.titleBlock}>
-            <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>Mi cronograma</Text>
+            <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>
+              {readOnly ? 'Cronograma' : 'Mi cronograma'}
+            </Text>
             <Text style={[styles.title, { color: colors.foreground }]}>
               {friendlyDate(selectedDate)}
             </Text>
@@ -226,7 +231,12 @@ export function ScheduleScreen({
         dayModes={dayModes}
       />
 
-      <DayModeBar dayKey={dayKey} mode={dayMode} onChange={(mode) => onSetDayMode(dayKey, mode)} />
+      <DayModeBar
+        dayKey={dayKey}
+        mode={dayMode}
+        onChange={(mode) => onSetDayMode(dayKey, mode)}
+        readOnly={readOnly}
+      />
 
       <FlatList
         style={styles.listBox}
@@ -239,6 +249,7 @@ export function ScheduleScreen({
             onPress={openEdit}
             onDelete={handleDeleteRequest}
             isCurrent={item.id === currentTaskId}
+            readOnly={readOnly}
           />
         )}
         contentContainerStyle={[
@@ -268,18 +279,20 @@ export function ScheduleScreen({
         showsVerticalScrollIndicator={false}
       />
 
-      <Pressable
-        onPress={openCreate}
-        accessibilityRole="button"
-        accessibilityLabel="Añadir actividad"
-        style={({ pressed }) => [
-          styles.fab,
-          shadow('lg', isDark),
-          { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 },
-        ]}
-      >
-        <Ionicons name="add" size={26} color={colors.onPrimary} />
-      </Pressable>
+      {readOnly ? null : (
+        <Pressable
+          onPress={openCreate}
+          accessibilityRole="button"
+          accessibilityLabel="Añadir actividad"
+          style={({ pressed }) => [
+            styles.fab,
+            shadow('lg', isDark),
+            { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 },
+          ]}
+        >
+          <Ionicons name="add" size={26} color={colors.onPrimary} />
+        </Pressable>
+      )}
 
       <TaskEditor
         visible={editorOpen}
