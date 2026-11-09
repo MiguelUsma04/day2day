@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, StyleSheet, View } from 'react-native';
-import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TopInsetTakenProvider } from '../components/HeaderInset';
 import { PersonSwitcher } from '../components/PersonSwitcher';
@@ -145,11 +145,6 @@ export function RootScreen() {
   // With the switcher on top, it takes the status-bar inset, so the tab
   // headers (via useHeaderInset) skip it. Modals keep the real insets.
   const hasSwitcher = partnerView.partner !== null;
-  // FoodScreen reads useSafeAreaInsets directly for its header and is not ours
-  // to change here, so only its subtree gets top: 0. Everything it renders
-  // inside (MealEditor, Sheet, ConfirmDialog) uses only the bottom inset.
-  // TODO: switch FoodScreen to useHeaderInset and drop this override.
-  const foodInsets = useMemo(() => ({ ...insets, top: 0 }), [insets]);
 
   if (store.isLoading) {
     return (
@@ -205,16 +200,14 @@ export function RootScreen() {
           ) : null}
 
           {tab === 'food' ? (
-            <SafeAreaInsetsContext.Provider value={hasSwitcher ? foodInsets : insets}>
-              <FoodScreen
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-                markedDays={markedDays}
-                nutrition={viewingPartner ? partnerNutrition : nutrition}
-                readOnly={viewingPartner}
-                onOpenProfile={viewingPartner ? noop : () => setTab('settings')}
-              />
-            </SafeAreaInsetsContext.Provider>
+            <FoodScreen
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              markedDays={markedDays}
+              nutrition={viewingPartner ? partnerNutrition : nutrition}
+              readOnly={viewingPartner}
+              onOpenProfile={viewingPartner ? noop : () => setTab('settings')}
+            />
           ) : null}
 
           {tab === 'report' ? (

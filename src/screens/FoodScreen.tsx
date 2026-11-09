@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useHeaderInset } from '../components/HeaderInset';
 import { CheckInCard } from '../components/food/CheckInCard';
 import { EmptySlotRow } from '../components/food/EmptySlotRow';
 import { MealEditor, type MealEditorMode } from '../components/food/MealEditor';
@@ -46,7 +46,7 @@ type TimelineEntry =
 
 export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, readOnly = false, onOpenProfile }: Props) {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
+  const headerTop = useHeaderInset();
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Meal | null>(null);
   const [draft, setDraft] = useState<MealDraft | null>(null);
@@ -150,7 +150,7 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={[styles.header, { paddingTop: headerTop + spacing.sm }]}>
         <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>Comida</Text>
         <Text style={[styles.title, { color: colors.foreground }]}>{friendlyDate(selectedDate)}</Text>
       </View>
