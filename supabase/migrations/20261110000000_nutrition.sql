@@ -3,12 +3,13 @@
 -- Migración ADITIVA: solo crea objetos nuevos, no toca las tablas existentes,
 -- así que el cliente anterior sigue funcionando igual. El cambio de políticas
 -- de tasks / todos / day_modes (lectura compartida con la pareja) vive aparte
--- en supabase/deploy/partner_read.sql y se aplica al desplegar.
+-- en supabase/deploy/partner_read.sql y se aplica a mano después de desplegar,
+-- cuando los dos teléfonos ya abrieron el cliente nuevo (ver su cabecera).
 --
 -- Los nombres de columna espejan las filas de src/storage/nutritionStore.ts.
 -- Los tiempos van como milisegundos epoch (bigint), igual que en init.sql.
 
-create extension if not exists pg_trgm;
+create extension if not exists pg_trgm with schema extensions;
 
 -- -------------------------------------------------------------- partners
 -- Quién puede leer los datos de quién. Solo existen dos cuentas, así que el
@@ -407,9 +408,10 @@ create policy "update user_foods" on public.user_foods
 
 -- ---------------------------------------------------------- search_foods
 -- Búsqueda difusa (trigramas) en el catálogo y en los alimentos de usuario.
--- security invoker: aplica el RLS de quien llama. Los operadores y
--- similarity() de pg_trgm se resuelven por el search_path del llamador
--- (en Supabase la extensión vive en el esquema extensions, ya incluido).
+-- security invoker: aplica el RLS de quien llama. search_path fijo para que
+-- los operadores y similarity() de pg_trgm (esquema extensions) se resuelvan
+-- igual sin importar quién llame. q se recorta (vacío: sin resultados), n se
+-- limita a 1..20 y los comodines % y _ de q se escapan en el ilike.
 create or replace function public.search_foods(q text, n int default 8)
 returns table (
   id        text,
@@ -423,23 +425,34 @@ returns table (
   similarity real
 )
 language sql stable security invoker
+set search_path = public, extensions
 as $$
+  with args as (
+    select btrim(coalesce(q, '')) as t,
+           least(greatest(coalesce(n, 8), 1), 20) as lim
+  ),
+  p as (
+    select t,
+           '%' || replace(replace(replace(t, '\', '\\'), '%', '\%'), '_', '\_') || '%' as pattern
+    from args
+    where t <> ''
+  )
   select s.id, s.source, s.name_es, s.kcal, s.protein_g, s.carbs_g, s.fat_g,
          s.verified, s.sim as similarity
   from (
     select f.id, f.source, f.name_es, f.kcal, f.protein_g, f.carbs_g, f.fat_g,
-           f.verified, similarity(f.name_es, q) as sim
-    from public.foods f
-    where f.name_es % q or f.name_es ilike '%' || q || '%'
+           f.verified, similarity(f.name_es, p.t) as sim
+    from public.foods f, p
+    where f.name_es % p.t or f.name_es ilike p.pattern escape '\'
     union all
     select u.id, u.source, u.name_es, u.kcal, u.protein_g, u.carbs_g, u.fat_g,
-           u.verified, similarity(u.name_es, q) as sim
-    from public.user_foods u
+           u.verified, similarity(u.name_es, p.t) as sim
+    from public.user_foods u, p
     where u.deleted_at is null
-      and (u.name_es % q or u.name_es ilike '%' || q || '%')
+      and (u.name_es % p.t or u.name_es ilike p.pattern escape '\')
   ) s
   order by s.sim desc, length(s.name_es)
-  limit n;
+  limit (select lim from args);
 $$;
 
 grant execute on function public.search_foods(text, int) to authenticated;
