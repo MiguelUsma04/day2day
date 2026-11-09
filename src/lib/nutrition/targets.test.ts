@@ -49,25 +49,44 @@ test('clampRate', () => {
 });
 
 test('proteinTarget', () => {
-  expect(proteinTarget({ goal: 'lose_fat', weightKg: 59, proteinGPerKg: 2.2 })).toBeCloseTo(129.8);
-  expect(Math.round(proteinTarget({ goal: 'lose_fat', weightKg: 59, proteinGPerKg: 2.2 }))).toBe(130);
+  expect(proteinTarget({ goal: 'lose_fat', weightKg: 59, proteinGPerKg: 2.2 })).toBe(130);
   expect(proteinTarget({ goal: 'maintain', weightKg: 60, proteinGPerKg: null })).toBeCloseTo(96);
 });
 
+const kcalOf = (m: { proteinG: number; carbsG: number; fatG: number }) => 4 * m.proteinG + 4 * m.carbsG + 9 * m.fatG;
+const T = { kcal: 2000, proteinG: 150, carbsG: 200, fatG: 67 };
+
 test('rebalanceMacros keeps kcal fixed', () => {
-  const t = { kcal: 2000, proteinG: 150, carbsG: 200, fatG: 67 };
   // (2000 - 680 - 603) / 4 = 179.25 -> 179 (brief said 180)
-  expect(rebalanceMacros(t, { proteinG: 170 })).toEqual({ kcal: 2000, proteinG: 170, carbsG: 179, fatG: 67 });
-  const c = rebalanceMacros(t, { carbsG: 300 });
-  expect(c.kcal).toBe(2000);
+  const p = rebalanceMacros(T, { proteinG: 170 });
+  expect(p).toEqual({ kcal: 2000, proteinG: 170, carbsG: 179, fatG: 67 });
+  const c = rebalanceMacros(T, { carbsG: 300 });
   expect(c.fatG).toBe(Math.round((2000 - 600 - 1200) / 9));
   expect(c.fatG).toBeLessThan(67);
+  for (const r of [p, c]) {
+    expect(r.kcal).toBe(2000);
+    expect(Math.abs(kcalOf(r) - 2000)).toBeLessThanOrEqual(5);
+  }
 });
 
-test('rebalanceMacros never goes negative', () => {
-  const t = { kcal: 2000, proteinG: 150, carbsG: 200, fatG: 67 };
-  const r = rebalanceMacros(t, { fatG: 200 });
+test('rebalanceMacros never goes negative and keeps the total', () => {
+  const f = rebalanceMacros(T, { fatG: 200 });
+  expect(f.carbsG).toBe(0);
+  expect(f.fatG).toBe(Math.round((2000 - 600) / 9));
+  expect(Math.abs(kcalOf(f) - 2000)).toBeLessThanOrEqual(5);
+});
+
+test('rebalanceMacros clamps a carbs overshoot', () => {
+  const r = rebalanceMacros(T, { carbsG: 600 });
+  expect(r.carbsG).toBe(350);
+  expect(r.fatG).toBe(0);
+  expect(Math.abs(kcalOf(r) - 2000)).toBeLessThanOrEqual(5);
+});
+
+test('rebalanceMacros clamps protein above kcal / 4', () => {
+  const r = rebalanceMacros(T, { proteinG: 600 });
+  expect(r.proteinG).toBe(500);
   expect(r.carbsG).toBe(0);
-  expect(r.fatG).toBe(Math.round((2000 - 600) / 9));
-  expect(rebalanceMacros(t, { carbsG: 600 }).fatG).toBe(0);
+  expect(r.fatG).toBe(0);
+  expect(Math.abs(kcalOf(r) - 2000)).toBeLessThanOrEqual(5);
 });

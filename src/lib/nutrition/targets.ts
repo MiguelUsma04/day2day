@@ -16,7 +16,7 @@ export function clampRate(goal: Goal, rate: number): number {
 }
 
 export function proteinTarget(a: { goal: Goal; weightKg: number; proteinGPerKg: number | null }): number {
-  return (a.proteinGPerKg ?? PROTEIN_G_PER_KG[a.goal]) * a.weightKg;
+  return Math.round((a.proteinGPerKg ?? PROTEIN_G_PER_KG[a.goal]) * a.weightKg);
 }
 
 export type DailyTarget = Macros & {
@@ -47,16 +47,23 @@ export function dailyTarget(a: {
   return { kcal, proteinG, carbsG, fatG, tdee, bmr, floorApplied, method };
 }
 
-/** Moves grams between macros while keeping kcal fixed; never returns negative values. */
+/**
+ * Changes exactly one macro while kcal stays fixed. Protein or fat changes are absorbed by carbs
+ * (carbs hit 0 first, then fat absorbs a protein change); a carbs change is absorbed by fat.
+ * Values are clamped so 4P + 4C + 9F never exceeds kcal beyond rounding.
+ */
 export function rebalanceMacros(
   t: Macros,
-  change: Partial<Pick<Macros, 'proteinG' | 'carbsG' | 'fatG'>>,
+  change: { proteinG: number } | { carbsG: number } | { fatG: number },
 ): Macros {
   const next = { ...t, ...change };
-  if (change.carbsG !== undefined && change.proteinG === undefined && change.fatG === undefined) {
+  if ('carbsG' in change) {
+    const maxCarbs = Math.max(0, Math.floor((t.kcal - 4 * next.proteinG) / 4));
+    next.carbsG = Math.min(Math.max(0, change.carbsG), maxCarbs);
     next.fatG = Math.max(0, Math.round((t.kcal - 4 * next.proteinG - 4 * next.carbsG) / 9));
     return next;
   }
+  if ('proteinG' in change) next.proteinG = Math.min(Math.max(0, change.proteinG), Math.floor(t.kcal / 4));
   const carbs = Math.round((t.kcal - 4 * next.proteinG - 9 * next.fatG) / 4);
   if (carbs >= 0) {
     next.carbsG = carbs;
