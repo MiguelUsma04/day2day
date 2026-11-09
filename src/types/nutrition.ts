@@ -76,3 +76,44 @@ export type Meal = Synced & {
   analysisId: string | null;
 };
 export type UserPortion = Synced & { foodKey: string; grams: number; samples: number }; // id = foodKey
+
+export type AnalyzeRequest = {
+  image?: { base64: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' };
+  note?: string;
+  slot: MealSlot;
+  date: string;
+  hints: { portions: { name: string; grams: number }[]; recentFoods: string[] };
+};
+export type AnalyzedItem = {
+  name: string;
+  nameEn: string;
+  cooking: string | null;
+  grams: number;
+  gramsMin: number;
+  gramsMax: number;
+  confidence: number;
+  isHiddenFat: boolean;
+  food: FoodRef;
+};
+export type Question = {
+  itemIndex: number;
+  text: string;
+  options: { label: string; gramsMultiplier: number }[];
+};
+export type AnalyzeResponse = {
+  analysisId: string;
+  items: AnalyzedItem[];
+  question: Question | null;
+  model: string;
+};
+export type FoodHit = {
+  id: string;
+  source: FoodSource;
+  name_es: string;
+  kcal: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  verified: boolean;
+  similarity: number;
+};
