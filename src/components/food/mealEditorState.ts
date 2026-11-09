@@ -45,7 +45,9 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const items = state.items.map((item, i) =>
         i === action.index ? { ...item, grams: action.grams, weighed: true, gramsMin: null, gramsMax: null } : item,
       );
-      return { ...state, items };
+      // A typed weight wins over the analysis question about that item.
+      const question = state.question?.itemIndex === action.index ? null : state.question;
+      return { ...state, items, question };
     }
 
     case 'removeItem': {
@@ -80,6 +82,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           ? {
               ...item,
               grams,
+              weighed: false, // still an estimate: never learned as a portion
               gramsMin: item.gramsMin === null ? null : round(item.gramsMin * ratio),
               gramsMax: item.gramsMax === null ? null : round(item.gramsMax * ratio),
             }

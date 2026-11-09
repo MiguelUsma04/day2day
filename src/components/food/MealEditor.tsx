@@ -188,10 +188,15 @@ export function MealEditor({
       source: meal ? meal.source : mode === 'photo' ? ('photo' as const) : ('text' as const),
       analysisId,
     };
+    // Learn only weights entered in this session; re-saving an edited meal must not re-count old ones.
+    const before = new Map((meal?.items ?? []).map((i) => [i.id, i]));
     for (const item of state.items) {
-      if (item.food && item.weighed) onRememberPortion(item.food.id, item.grams);
+      if (!item.food || !item.weighed) continue;
+      const prev = before.get(item.id);
+      if (prev && prev.weighed && prev.grams === item.grams) continue;
+      onRememberPortion(item.food.id, item.grams);
     }
-    void clearMealDraft();
+    if (mode !== 'edit') void clearMealDraft();
     onSave(meal ? { ...meal, ...fields } : fields);
   };
 

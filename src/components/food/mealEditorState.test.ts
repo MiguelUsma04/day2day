@@ -49,6 +49,24 @@ test('answer multiplies the original grams, clears the question, and does not co
   expect(s.items[0].grams).toBe(100);
 });
 
+test('typing the weight of the questioned item closes the question', () => {
+  let s = editorReducer(withItems([item('a'), item('b')], question(1)), { type: 'setGrams', index: 1, grams: 210 });
+  expect(s.question).toBeNull();
+  s = editorReducer(s, { type: 'answer', optionIndex: 2 });
+  expect(s.items[1]).toMatchObject({ grams: 210, weighed: true });
+});
+
+test('typing the weight of another item keeps the question', () => {
+  const s = editorReducer(withItems([item('a'), item('b')], question(1)), { type: 'setGrams', index: 0, grams: 90 });
+  expect(s.question?.itemIndex).toBe(1);
+});
+
+test('answer leaves the item not weighed', () => {
+  let s = withItems([item('a', { weighed: true })], question(0));
+  s = editorReducer(s, { type: 'answer', optionIndex: 2 });
+  expect(s.items[0].weighed).toBe(false);
+});
+
 test('answer without a question is a no-op', () => {
   const s = withItems([item('a')]);
   expect(editorReducer(s, { type: 'answer', optionIndex: 0 })).toBe(s);
