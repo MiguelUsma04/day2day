@@ -25,6 +25,8 @@ import { accountFor } from '../auth/accounts';
 import { useAuth } from '../auth/AuthProvider';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import type { CloudSync } from '../storage/useCloudSync';
+import type { NutritionStore } from '../storage/useNutrition';
+import { ProfileScreen } from './ProfileScreen';
 import { shadow } from '../theme/shadows';
 import { MODES, useTheme, type ModePreference } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
@@ -60,6 +62,8 @@ type Props = {
   onImport: (tasks: TaskDraft[], replace: boolean) => number;
   onRestore: (tasks: Task[], todos: Todo[], dayModes: DayModeRecord[]) => void;
   onClear: (what: { tasks?: boolean; todos?: boolean; history?: boolean }) => void;
+  /** Nutrition data; when present, shows the profile and goals entry. */
+  nutrition?: NutritionStore;
 };
 
 /** What a bulk-delete option removes, and how it is described before doing it. */
@@ -147,6 +151,7 @@ export function SettingsScreen({
   onImport,
   onRestore,
   onClear,
+  nutrition,
 }: Props) {
   const { colors, isDark, themeId, mode, options, setThemeId, setMode } = useTheme();
   const insets = useSafeAreaInsets();
@@ -160,6 +165,7 @@ export function SettingsScreen({
   const [importContext, setImportContext] = useState<TaskContext>('any');
   const [feedback, setFeedback] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null);
   const [pendingClear, setPendingClear] = useState<ClearKind | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleSignOut = useCallback(async () => {
     void Haptics.selectionAsync();
@@ -399,6 +405,34 @@ export function SettingsScreen({
       showsVerticalScrollIndicator={false}
     >
       <Text style={[styles.screenTitle, { color: colors.foreground }]}>Ajustes</Text>
+
+      {nutrition ? (
+        <>
+          <Pressable
+            onPress={() => {
+              void Haptics.selectionAsync();
+              setProfileOpen(true);
+            }}
+            accessibilityRole="button"
+            style={({ pressed }) => [card, styles.profileRow, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="person-outline" size={20} color={colors.foreground} />
+            <Text style={[styles.cardTitle, { color: colors.foreground, flex: 1 }]}>Mi perfil y metas</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+          </Pressable>
+          <ProfileScreen
+            visible={profileOpen}
+            profile={nutrition.profile}
+            measurements={nutrition.measurements}
+            currentWeightKg={nutrition.currentWeightKg()}
+            onSave={nutrition.saveProfile}
+            onAddMeasurement={nutrition.addMeasurement}
+            onUpdateMeasurement={nutrition.updateMeasurement}
+            onDeleteMeasurement={nutrition.deleteMeasurement}
+            onClose={() => setProfileOpen(false)}
+          />
+        </>
+      ) : null}
 
       {/* ---- Account & sync ---- */}
       {auth.configured && auth.user ? (
@@ -970,6 +1004,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, gap: spacing.lg },
   screenTitle: { fontFamily: fontFamily.bold, fontSize: fontSize.headline },
   card: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg, gap: spacing.sm },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   cardTitle: { fontFamily: fontFamily.semibold, fontSize: fontSize.footnote },
   cardHint: { fontFamily: fontFamily.regular, fontSize: fontSize.caption, lineHeight: 18 },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.xs },
