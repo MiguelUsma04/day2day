@@ -352,7 +352,7 @@ create table if not exists public.foods (
 );
 
 create index if not exists foods_name_es_trgm_idx
-  on public.foods using gin (name_es gin_trgm_ops);
+  on public.foods using gin (name_es extensions.gin_trgm_ops);
 
 alter table public.foods enable row level security;
 
@@ -387,7 +387,7 @@ create table if not exists public.user_foods (
 
 create index if not exists user_foods_user_synced_idx on public.user_foods (user_id, synced_at);
 create index if not exists user_foods_name_es_trgm_idx
-  on public.user_foods using gin (name_es gin_trgm_ops);
+  on public.user_foods using gin (name_es extensions.gin_trgm_ops);
 
 drop trigger if exists user_foods_touch_synced_at on public.user_foods;
 create trigger user_foods_touch_synced_at
@@ -441,15 +441,15 @@ as $$
          s.verified, s.sim as similarity
   from (
     select f.id, f.source, f.name_es, f.kcal, f.protein_g, f.carbs_g, f.fat_g,
-           f.verified, similarity(f.name_es, p.t) as sim
+           f.verified, extensions.similarity(f.name_es, p.t) as sim
     from public.foods f, p
-    where f.name_es % p.t or f.name_es ilike p.pattern escape '\'
+    where f.name_es operator(extensions.%) p.t or f.name_es ilike p.pattern escape '\'
     union all
     select u.id, u.source, u.name_es, u.kcal, u.protein_g, u.carbs_g, u.fat_g,
-           u.verified, similarity(u.name_es, p.t) as sim
+           u.verified, extensions.similarity(u.name_es, p.t) as sim
     from public.user_foods u, p
     where u.deleted_at is null
-      and (u.name_es % p.t or u.name_es ilike p.pattern escape '\')
+      and (u.name_es operator(extensions.%) p.t or u.name_es ilike p.pattern escape '\')
   ) s
   order by s.sim desc, length(s.name_es)
   limit (select lim from args);
