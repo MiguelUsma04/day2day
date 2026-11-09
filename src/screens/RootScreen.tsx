@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { TabBar, type TabId } from '../components/TabBar';
+import { useNutrition } from '../storage/useNutrition';
 import { useTasks } from '../storage/useTasks';
 import { useTheme } from '../theme/ThemeProvider';
 import { toDayKey } from '../utils/date';
 import { useAuth } from '../auth/AuthProvider';
 import { scheduleReminders } from '../utils/notifications';
 import { syncReminders, uploadBeacon } from '../utils/webpush';
+import { FoodScreen } from './FoodScreen';
 import { ReportScreen } from './ReportScreen';
 import { ScheduleScreen } from './ScheduleScreen';
 import { SettingsScreen } from './SettingsScreen';
@@ -21,6 +23,7 @@ export function RootScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const store = useTasks(user?.id ?? null);
+  const nutrition = useNutrition(user?.id ?? null);
   const [tab, setTab] = useState<TabId>('schedule');
   const [selectedDate, setSelectedDate] = useState(() => new Date());
 
@@ -132,11 +135,22 @@ export function RootScreen() {
           />
         ) : null}
 
+        {tab === 'food' ? (
+          <FoodScreen
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            markedDays={store.markedDays}
+            nutrition={nutrition}
+            onOpenProfile={() => setTab('settings')}
+          />
+        ) : null}
+
         {tab === 'report' ? (
           <ReportScreen tasks={store.tasks} todos={store.todos} dayModes={store.dayModes} />
         ) : null}
 
         {tab === 'settings' ? (
+          // TODO(T12): pass nutrition
           <SettingsScreen
             tasks={store.tasks}
             todos={store.todos}
