@@ -1,0 +1,315 @@
+code,page,name_es,name_en,kcal,protein_g,carbs_g,fat_g,fiber_g,default_portion_g,tags
+A002,43,"Almojábana bogotana, horneada",Almojabana (Bogota style),285,13.0,30.6,12.3,,60,cereal|horneado|pan
+A003,43,"Almojábana vallecaucana, horneada",Almojabana (Valle style),341,17.5,34.6,14.7,,60,cereal|horneado|pan
+A004,43,"Arepa de maíz precocido, con sal","Corn arepa, salted",163,3.3,35.0,0.9,0.9,80,cereal|arepa
+A005,43,"Arepa de maíz precocido, sin sal","Corn arepa, unsalted",156,3.4,34.5,0.5,,80,cereal|arepa
+A006,43,"Arepa de maíz, asada",Grilled corn arepa,162,4.1,36.3,0.0,,80,cereal|asado|arepa
+A007,43,"Arepa de maíz con queso, asada",Grilled corn arepa with cheese,211,4.8,29.0,8.4,,100,cereal|asado|queso|arepa
+A008,43,"Arepa de maíz, frita",Fried corn arepa,325,3.4,32.1,20.3,,80,cereal|frito|arepa
+A009,43,Arroz blanco cocido,"White rice, cooked",161,2.3,32.5,2.1,1.6,160,cereal|cocido|arroz
+A010,43,Arroz blanco crudo,"White rice, raw",353,6.7,80.1,0.4,1.0,,cereal|crudo|arroz
+A012,43,Avena en hojuelas,Rolled oats,411,16.9,64.1,7.5,9.8,40,cereal
+A013,43,Brownie de chocolate,Chocolate brownie,427,4.8,64.2,16.3,2.1,60,cereal
+A015,43,Cereal hojuelas de maíz sin azúcar,"Corn flakes, unsweetened",383,8.1,85.0,0.4,3.3,30,cereal
+A016,43,Croissant de queso,Cheese croissant,445,9.2,48.9,23.0,2.6,60,cereal|queso|pan
+A019,43,Envuelto de mazorca,Fresh corn tamale (envuelto de mazorca),186,4.8,23.5,7.9,0.8,120,cereal|envuelto
+A020,43,Galletas dulces con relleno,"Sandwich cookies, filled",516,3.8,70.1,24.1,1.6,30,cereal|galleta
+A022,43,Galletas de avena con uvas pasas,Oatmeal raisin cookies,451,6.5,68.6,16.2,2.6,30,cereal|galleta
+A023,43,Galletas dulces sin relleno,"Sweet cookies, plain",472,6.4,67.1,19.6,1.2,30,cereal|galleta
+A025,43,Galletas tipo wafer,Wafer cookies,455,5.4,73.2,15.2,1.9,30,cereal|galleta
+A026,43,Galletas saladas tipo cracker,Crackers,466,8.4,68.2,17.2,2.3,30,cereal|galleta
+A027,43,Galletas saladas tipo soda,Soda crackers,424,9.6,72.9,9.7,3.0,30,cereal|galleta
+A029,45,Harina de avena,Oat flour,414,14.7,66.2,8.6,6.5,,cereal
+A033,45,Harina de maíz amarillo precocida,Precooked yellow corn flour,386,7.7,77.6,3.3,7.3,,cereal
+A034,45,Harina de maíz blanco precocida,Precooked white corn flour,380,9.1,73.9,3.7,7.5,,cereal
+A040,45,Harina de trigo todo propósito,All-purpose wheat flour,360,12.5,72.3,1.7,2.6,,cereal
+A042,45,Hojaldre,Puff pastry,555,7.4,44.0,38.5,1.5,,cereal
+A051,45,Maíz pira (crispetas) crudo,"Popcorn kernels, raw",392,10.9,71.1,4.3,12.7,,cereal|crudo
+A053,45,Maíz tierno (mazorca) crudo,"Sweet corn, raw",152,3.4,30.5,1.2,2.6,,cereal|crudo
+A055,45,Mezcla para pancakes en polvo,"Pancake mix, dry",363,11.7,72.8,1.6,5.4,,cereal
+A057,45,Mogolla integral,Whole wheat roll (mogolla),310,7.2,66.1,1.9,,60,cereal|pan
+A058,45,Mojicón,Mojicon sweet bun,310,9.3,63.7,1.9,0.6,60,cereal|pan
+A059,47,Muffin con chips de chocolate,Chocolate chip muffin,325,7.3,45.1,12.4,2.0,80,cereal
+A060,47,Pan blanco,White bread,268,8.9,48.8,3.4,3.2,30,cereal|pan
+A061,47,Pan tajado blanco (molde),Sliced white bread,278,8.9,56.8,1.6,0.7,25,cereal|pan
+A063,47,Pan dulce (pan de dulce),Sweet bread,328,8.9,63.1,4.3,0.6,50,cereal|pan
+A064,47,Pan de leche,Milk bread,281,8.6,49.7,4.8,2.1,50,cereal|pan|leche
+A065,47,Pan de queso,Cheese bread,367,10.4,33.5,20.8,2.1,50,cereal|queso|pan
+A066,47,Pan de sal,Salted bread roll,340,11.1,59.3,6.4,0.4,50,cereal|pan
+A067,47,Pan de yuca,Yuca bread (pan de yuca),355,15.8,45.5,12.2,,50,cereal|pan
+A068,47,Pan francés,French bread,308,10.1,61.1,2.1,2.3,50,cereal|pan
+A069,47,Pan integral,Whole wheat bread,279,9.4,50.4,3.1,6.5,30,cereal|pan
+A070,47,Pandebono,Pandebono,357,15.8,50.7,10.1,,50,cereal|pan
+A073,47,Pasta cocida,"Pasta, cooked",143,5.8,27.0,0.9,1.8,140,cereal|cocido
+A074,47,Pasta cruda,"Pasta, dry",371,13.0,74.8,1.4,3.2,,cereal|crudo
+A077,47,Ponqué blanco,Pound cake,403,5.3,51.7,19.2,1.0,60,cereal
+A078,47,Ponqué negro cubierto de chocolate,Chocolate-covered dark cake,417,3.5,54.4,20.1,2.2,60,cereal
+A079,47,Quinua cruda,"Quinoa, raw",376,14.6,66.4,4.4,6.5,,cereal|crudo
+A083,47,Roscón de arequipe,Arequipe-filled roscon,349,6.2,66.1,6.6,,80,cereal
+A084,47,Roscón de bocadillo,Guava paste roscon,345,7.9,62.9,6.8,,80,cereal
+A087,47,Tostadas (calados),Toasts (calados),398,10.0,72.3,6.8,3.6,10,cereal
+B001,49,Aceitunas,Olives,176,1.1,8.3,14.7,3.3,,verdura
+B005,49,Ahuyama cocida,"Squash (ahuyama), cooked",48,0.7,8.4,0.7,2.5,,verdura|cocido
+B006,49,Ahuyama cruda,"Squash (ahuyama), raw",30,0.8,5.8,0.2,1.1,,verdura|crudo
+B007,49,Ají dulce crudo,"Sweet pepper (aji dulce), raw",42,1.0,5.1,1.6,1.8,,verdura|crudo
+B009,49,Ajo crudo,"Garlic, raw",144,4.7,29.3,0.3,2.8,,verdura|crudo
+B014,49,Apio crudo,"Celery, raw",26,0.7,4.6,0.2,1.9,,verdura|crudo
+B016,49,Arracacha blanca cruda,"White arracacha, raw",109,0.8,25.2,0.1,2.1,,verdura|crudo
+B018,49,Arveja verde cocida,"Green peas, cooked",120,6.7,19.7,0.3,6.0,,verdura|cocido
+B019,49,Arveja verde cruda,"Green peas, raw",99,5.9,15.5,0.3,5.3,,verdura|crudo
+B021,49,Batata cruda,"Sweet potato, raw",99,1.2,21.9,0.1,2.8,,verdura|crudo
+B023,49,Berenjena cruda,"Eggplant, raw",35,1.0,5.7,0.2,3.0,,verdura|crudo
+B025,49,Brócoli crudo,"Broccoli, raw",46,3.0,6.6,0.3,2.6,,verdura|crudo
+B026,49,Calabaza cruda,"Zucchini (calabaza), raw",31,0.8,4.5,0.4,2.9,,verdura|crudo
+B027,49,Cebolla cabezona cruda,"Onion, raw",40,1.4,7.7,0.1,1.7,,verdura|crudo
+B028,49,Cebolla junca (larga) hojas cruda,"Green onion leaves, raw",41,1.6,7.1,0.2,2.1,,verdura|crudo
+B030,51,Cebolla puerro cruda,"Leek, raw",69,1.6,14.4,0.1,1.8,,verdura|crudo
+B033,51,Champiñón crudo,"Mushrooms, raw",32,3.1,3.0,0.6,1.0,,verdura|crudo
+B035,51,Cilantro crudo,"Cilantro, raw",44,2.3,5.9,0.6,2.8,,verdura|crudo
+B039,51,Coliflor cruda,"Cauliflower, raw",36,1.9,5.7,0.1,2.4,,verdura|crudo
+B043,51,Espinaca cocida,"Spinach, cooked",35,2.9,4.1,0.1,2.6,,verdura|cocido
+B044,51,Espinaca cruda,"Spinach, raw",34,2.9,3.8,0.2,2.6,,verdura|crudo
+B045,51,Fríjol verde cocido,"Fresh beans, cooked",147,9.3,25.5,0.4,2.2,,verdura|cocido|grano
+B048,51,Guatila cruda,"Chayote, raw",27,0.8,5.2,0.0,1.7,,verdura|crudo
+B051,51,Habichuela cocida,"Green beans, cooked",32,1.6,4.8,0.1,2.8,,verdura|cocido
+B052,51,Habichuela cruda,"Green beans, raw",43,2.1,7.2,0.0,3.0,,verdura|crudo
+B059,51,Lechuga común cruda,"Lettuce, raw",18,0.8,2.6,0.1,1.7,,verdura|crudo
+B060,51,Lechuga romana cruda,"Romaine lettuce, raw",23,1.1,3.3,0.1,2.1,,verdura|crudo
+B064,53,Papa sabanera con cáscara cocida,"Sabanera potato with skin, boiled",99,2.3,21.0,0.1,2.3,,verdura|cocido
+B066,53,Papa sabanera con cáscara frita,"Sabanera potato with skin, fried",274,5.9,49.9,5.6,,,verdura|frito
+B067,53,Papa sabanera pelada cocida,"Sabanera potato, peeled, boiled",98,2.1,21.4,0.1,1.7,,verdura|cocido
+B068,53,Papa sabanera pelada cruda,"Sabanera potato, peeled, raw",74,1.9,15.3,0.1,2.1,,verdura|crudo
+B069,53,Papa a la francesa,French fries,313,3.4,38.2,15.5,3.7,,verdura|frito
+B070,53,Papa criolla cocida,"Criolla potato, boiled",85,1.4,18.1,0.0,3.0,,verdura|cocido
+B071,53,Papa criolla cruda,"Criolla potato, raw",96,2.2,21.1,0.1,0.6,,verdura|crudo
+B075,53,Papa pastusa pelada cocida,"Pastusa potato, peeled, boiled",96,2.0,20.9,0.1,1.8,,verdura|cocido
+B076,53,Papa pastusa pelada cruda,"Pastusa potato, peeled, raw",97,2.0,20.9,0.2,1.9,,verdura|crudo
+B077,53,Pepino cohombro crudo,"Cucumber, raw",14,0.5,2.3,0.1,0.7,,verdura|crudo
+B079,53,Perejil crudo,"Parsley, raw",55,2.9,6.9,1.0,3.3,,verdura|crudo
+B080,53,Pimentón rojo crudo,"Red bell pepper, raw",35,1.0,6.3,0.3,1.7,,verdura|crudo
+B081,53,Pimentón verde crudo,"Green bell pepper, raw",28,0.9,4.9,0.1,1.9,,verdura|crudo
+B084,53,Guineo verde crudo,"Green guineo banana, raw",128,1.3,30.3,0.1,0.4,,verdura|crudo|platano
+B088,53,Plátano maduro cocido,"Ripe plantain, boiled",130,0.8,30.1,0.2,2.3,,verdura|cocido|platano
+B089,53,Plátano maduro crudo,"Ripe plantain, raw",132,1.1,30.3,0.2,2.3,,verdura|crudo|platano
+B090,55,Plátano maduro frito (tajadas),Fried ripe plantain slices,312,1.2,52.6,10.2,2.5,,verdura|frito|platano
+B091,55,Plátano verde cocido,"Green plantain, boiled",133,0.9,30.6,0.3,2.3,,verdura|cocido|platano
+B092,55,Plátano verde crudo,"Green plantain, raw",166,1.2,39.3,0.2,1.2,,verdura|crudo|platano
+B093,55,Patacón (plátano verde frito),Patacon (fried green plantain),353,1.6,41.8,19.2,3.5,,verdura|frito|platano
+B096,55,Rábano crudo,"Radish, raw",22,0.8,3.7,0.1,1.6,,verdura|crudo
+B097,55,Remolacha cocida,"Beet, cooked",53,1.5,10.1,0.2,2.7,,verdura|cocido
+B098,55,Remolacha cruda,"Beet, raw",53,1.4,10.3,0.1,2.8,,verdura|crudo
+B099,55,Repollo blanco crudo,"White cabbage, raw",40,1.8,6.4,0.3,2.6,,verdura|crudo|pollo
+B101,55,Repollo morado crudo,"Red cabbage, raw",39,1.4,6.5,0.3,2.1,,verdura|crudo|pollo
+B103,55,Tomate crudo,"Tomato, raw",23,0.9,4.1,0.1,1.2,,verdura|crudo
+B106,55,Yuca cocida,"Cassava, boiled",157,0.7,36.6,0.2,2.7,,verdura|cocido
+B107,55,Yuca cruda,"Cassava, raw",159,0.9,37.4,0.3,1.8,,verdura|crudo
+B108,55,Yuca frita (dorada),Fried cassava,231,0.9,43.6,5.1,3.4,,verdura|frito
+B109,55,Zanahoria cocida,"Carrot, cooked",43,0.8,8.1,0.2,2.8,,verdura|cocido
+B110,55,Zanahoria cruda,"Carrot, raw",47,0.7,9.5,0.1,2.7,,verdura|crudo
+B111,55,Zapallo crudo,"Pumpkin, raw",46,0.9,9.5,0.2,1.3,,verdura|crudo
+C001,57,Aguacate Hass,Hass avocado,221,1.3,13.5,16.4,6.8,,fruta
+C002,57,Aguacate común (Lorena),Avocado (Lorena),179,1.6,10.0,13.3,6.6,,fruta
+C003,57,Almendras,Almonds,639,18.6,13.9,54.1,10.9,,fruta
+C009,57,Banano bocadillo,Bocadillo banana,125,1.2,28.9,0.1,2.0,,fruta
+C010,57,Banano,Banana,101,1.5,22.3,0.1,2.6,100,fruta
+C016,57,Chontaduro,Peach palm (chontaduro),358,6.3,19.0,25.7,12.7,,fruta
+C019,57,Coco,Coconut,402,3.6,12.6,35.5,9.0,,fruta
+C021,57,Curuba,Banana passionfruit (curuba),38,0.6,8.5,0.1,0.1,,fruta
+C023,57,Durazno,Peach,58,1.0,12.5,0.1,1.5,,fruta
+C024,57,Feijoa,Feijoa,83,1.7,15.8,0.0,6.4,,fruta
+C025,57,Fresa,Strawberry,45,0.8,8.3,0.5,2.0,,fruta
+C028,57,Granadilla,Sweet granadilla,95,2.1,14.9,1.6,5.9,,fruta
+C030,59,Guanábana,Soursop,33,0.6,6.8,0.2,0.8,,fruta
+C031,59,Guayaba madura,"Guava, ripe",71,0.9,13.4,0.3,5.4,,fruta
+C033,59,Gulupa madura,Purple passionfruit (gulupa),74,0.9,17.2,0.1,0.2,,fruta
+C042,59,Kiwi,Kiwi,73,1.0,15.0,0.4,2.9,,fruta
+C044,59,Limón,Lemon,44,0.3,9.3,0.3,1.5,,fruta
+C045,59,Lulo,Lulo (naranjilla),48,0.9,8.9,0.1,3.6,,fruta
+C050,59,Mandarina,Mandarin,54,0.9,11.4,0.1,1.8,,fruta
+C051,59,Mango común,Mango,79,0.6,17.1,0.0,3.9,,fruta
+C054,59,Manzana,Apple,72,0.3,16.5,0.2,1.5,150,fruta
+C056,59,Maracuyá,Passion fruit,60,1.5,12.4,0.5,0.2,,fruta
+C059,59,Marañón tostado sin sal,"Cashews, roasted, unsalted",620,15.3,33.9,46.4,3.0,,fruta
+C060,59,Melón,Cantaloupe melon,25,0.7,5.0,0.0,1.0,,fruta
+C061,59,Mora de Castilla,Andean blackberry (mora),74,1.0,14.6,0.1,5.3,,fruta
+C062,61,Naranja,Orange,41,0.7,8.8,0.3,0.2,,fruta
+C065,61,Papaya,Papaya,40,0.5,8.2,0.1,2.0,,fruta
+C071,61,Pera,Pear,63,0.3,12.9,0.2,4.4,,fruta
+C072,61,Piña,Pineapple,56,0.6,12.4,0.1,1.7,,fruta
+C075,61,Pitahaya amarilla,Yellow dragon fruit,63,0.4,13.6,0.1,3.3,,fruta
+C079,61,Sandía,Watermelon,17,0.4,3.7,0.0,0.4,,fruta
+C082,61,Tomate de árbol,Tamarillo (tree tomato),55,2.0,10.2,0.2,2.0,,fruta
+C084,61,Uchuva,Goldenberry (uchuva),77,1.5,14.2,0.5,5.1,,fruta
+C086,61,Uva Isabella,Isabella grapes,51,0.4,12.1,0.0,0.4,,fruta
+C087,61,Uvas pasas,Raisins,327,2.5,75.2,0.3,6.7,,fruta
+D003,63,Aceite de canola,Canola oil,900,0.0,0.0,100.0,0.0,,grasa|aceite
+D004,63,Aceite de girasol,Sunflower oil,900,0.0,0.0,100.0,0.0,,grasa|aceite
+D006,63,Aceite de maíz,Corn oil,900,0.0,0.0,100.0,0.0,,grasa|aceite
+D008,63,Aceite de oliva,Olive oil,900,0.0,0.0,100.0,0.0,,grasa|aceite
+D012,63,Aceite de soya,Soybean oil,900,0.0,0.0,100.0,0.0,,grasa|aceite
+D013,63,Aceite vegetal (mezcla),Vegetable oil blend,900,0.0,0.0,100.0,0.0,,grasa|aceite
+D014,63,Manteca de cerdo,Lard,891,0.0,0.0,99.0,0.0,,grasa|cerdo
+D015,63,Mantequilla,Butter,743,0.8,0.0,82.2,0.0,,grasa
+D016,63,Mantequilla de maní,Peanut butter,643,24.6,20.7,50.0,5.8,,grasa
+D018,63,Margarina,Margarine,732,0.6,0.0,81.1,0.0,,grasa
+D020,63,Mayonesa,Mayonnaise,326,0.9,5.4,33.4,0.0,,grasa
+E003,65,Atún enlatado en aceite,Tuna canned in oil,211,25.5,0.0,12.1,0.0,,pescado|aceite
+E004,65,Atún enlatado en agua,Tuna canned in water,127,24.2,0.9,3.0,0.0,,pescado
+E009,65,Bocachico cocido,"Bocachico fish, cooked",138,20.1,0.0,6.4,0.0,,pescado|cocido
+E013,65,Cachama frita,"Cachama fish, fried",254,27.0,0.0,16.2,0.0,,pescado|frito
+E015,65,Calamar crudo,"Squid, raw",79,16.4,0.1,1.5,0.0,,pescado|crudo
+E016,65,Camarón cocido,"Shrimp, cooked",103,23.5,0.0,1.0,0.0,,pescado|cocido
+E017,65,Camarón crudo,"Shrimp, raw",94,20.3,0.5,1.2,0.0,,pescado|crudo
+E021,65,Corvina filete crudo,"Corvina fillet, raw",100,17.8,0.0,3.2,0.0,,pescado|crudo
+E030,67,Merluza filete crudo,"Hake fillet, raw",85,18.3,0.1,1.3,0.0,,pescado|crudo
+E038,67,Salmón filete crudo,"Salmon fillet, raw",181,20.2,0.3,11.0,0.0,,pescado|crudo
+E039,67,Sardinas en aceite,Sardines in oil,225,24.6,0.0,14.1,0.0,,pescado|aceite
+E040,67,Sardinas en salsa de tomate,Sardines in tomato sauce,177,20.9,0.1,10.3,0.0,,pescado
+E043,67,Tilapia (mojarra) cruda,"Tilapia, raw",96,20.1,0.0,1.7,0.0,,pescado|crudo
+E044,67,Tilapia (mojarra) frita,"Tilapia, fried",227,26.3,0.0,13.5,0.0,,pescado|frito
+E047,67,Trucha cruda,"Trout, raw",135,19.9,0.0,6.2,0.0,,pescado|crudo
+F003,69,Butifarra,Butifarra sausage,256,15.2,3.3,20.2,0.0,,carne|cerdo
+F007,69,Cerdo brazo cocido,"Pork shoulder, cooked",184,26.8,0.0,8.5,0.0,,carne|cocido|cerdo
+F014,69,Costilla de cerdo cocida,"Pork ribs, cooked",258,29.5,0.0,15.6,0.0,,carne|cocido|cerdo
+F016,69,Costilla de cerdo horneada,"Pork ribs, baked",341,24.4,0.0,27.0,0.0,,carne|horneado|cerdo
+F018,69,Lomo de cerdo cocido,"Pork loin, cooked",170,35.1,0.0,3.2,0.0,,carne|cocido|cerdo
+F019,69,Lomo de cerdo crudo,"Pork loin, raw",110,21.6,0.3,2.5,0.0,,carne|crudo|cerdo
+F020,69,Lomo de cerdo horneado,"Pork loin, baked",170,35.1,0.2,3.2,0.0,,carne|horneado|cerdo
+F023,69,Tocineta salteada,"Bacon, sauteed",354,22.4,0.0,29.4,0.0,,carne|cerdo
+F024,69,Pernil de cerdo cocido,"Pork leg, cooked",148,27.1,0.0,4.3,0.0,,carne|cocido|cerdo
+F026,69,Pernil de cerdo horneado,"Pork leg, baked",202,29.4,0.0,9.4,0.0,,carne|horneado|cerdo
+F028,69,Tocino de cerdo cocido,"Pork fatback, cooked",751,10.4,0.0,78.8,0.0,,carne|cocido|cerdo
+F030,71,Chicharrón (tocino frito),Chicharron (fried pork belly),599,20.8,2.8,56.1,0.0,,carne|frito|cerdo
+F034,71,Chorizo de cerdo y res crudo,"Chorizo, pork and beef, raw",321,24.1,4.0,23.1,0.0,,carne|crudo|res|cerdo|embutido
+F035,71,Chorizo de pollo crudo,"Chicken chorizo, raw",217,31.3,0.1,10.2,0.0,,carne|crudo|pollo|embutido
+F048,71,Gallina con piel cruda,"Hen with skin, raw",256,18.9,0.0,20.0,0.0,,carne|crudo|pollo
+F049,71,Carne de hamburguesa de res cruda,"Beef burger patty, raw",276,16.2,0.2,23.3,0.0,,carne|crudo|res
+F051,71,Jamón sánduche (cerdo y res),Sandwich ham,215,11.4,7.4,15.5,0.0,,carne|res|cerdo|embutido
+F053,71,Jamón tipo york,York ham,143,14.6,8.3,5.7,0.0,,carne|embutido
+F054,71,Mortadela de cerdo y res,"Bologna, pork and beef",298,16.7,4.3,23.8,0.0,,carne|res|cerdo|embutido
+F055,71,Mortadela de pollo,Chicken bologna,291,16.4,7.8,21.6,0.0,,carne|pollo|embutido
+F059,71,Pavo entero con piel crudo,"Whole turkey with skin, raw",156,20.9,0.0,8.0,0.0,,carne|crudo
+F062,73,Pechuga de pavo horneada,"Turkey breast, roasted",144,30.1,0.0,2.6,0.0,,carne|horneado
+F067,73,Alas de pollo asadas,"Chicken wings, roasted",247,23.8,0.0,16.9,0.0,,carne|asado|pollo
+F070,73,Alas de pollo fritas,"Chicken wings, fried",313,26.1,2.2,22.2,0.0,,carne|frito|pollo
+F072,73,Contramuslo de pollo con piel cocido,"Chicken thigh with skin, cooked",221,22.9,0.0,14.4,0.0,,carne|cocido|pollo
+F074,73,Contramuslo de pollo sin piel cocido,"Chicken thigh, skinless, cooked",186,24.7,0.0,9.7,0.0,,carne|cocido|pollo
+F075,73,Contramuslo de pollo sin piel crudo,"Chicken thigh, skinless, raw",139,18.9,0.0,7.0,0.0,,carne|crudo|pollo
+F078,73,Hígado de pollo cocido,"Chicken liver, cooked",160,24.4,0.9,6.5,0.0,,carne|cocido|pollo
+F082,73,Molleja de pollo cocida,"Chicken gizzard, cooked",138,27.1,1.4,2.7,0.0,,carne|cocido|pollo
+F084,73,Pechuga de pollo con piel cocida,"Chicken breast with skin, cooked",174,26.9,0.0,7.4,0.0,,carne|cocido|pollo
+F086,73,Pechuga de pollo asada,"Chicken breast, grilled",164,29.7,0.2,4.9,0.0,,carne|asado|pollo
+F087,75,Pechuga de pollo cocida,"Chicken breast, boiled",141,28.4,0.3,3.0,0.0,,carne|cocido|pollo
+F088,75,Pechuga de pollo frita,"Chicken breast, fried",178,33.4,0.5,4.7,0.0,,carne|frito|pollo
+F089,75,Pierna de pollo asada,"Chicken drumstick, roasted",183,24.0,0.6,9.4,0.0,,carne|asado|pollo
+F090,75,Pierna de pollo cocida,"Chicken drumstick, cooked",208,22.9,0.0,12.9,0.0,,carne|cocido|pollo
+F092,75,Pierna de pollo frita,"Chicken drumstick, fried",265,17.1,8.2,18.2,0.0,,carne|frito|pollo
+F093,75,Pierna de pollo sin piel cocida,"Chicken drumstick, skinless, cooked",173,25.0,0.0,8.1,0.0,,carne|cocido|pollo
+F095,75,Cadera de res frita,"Beef rump, fried",176,28.7,0.5,6.6,0.0,,carne|frito|res
+F096,75,Callo (menudo) de res cocido,"Beef tripe, cooked",102,15.0,1.1,4.1,0.0,,carne|cocido|res
+F099,75,Carne de res magra cruda,"Lean beef, raw",139,21.8,0.0,5.7,0.0,,carne|crudo|res
+F101,75,Carne de res molida cruda,"Ground beef, raw",194,19.6,0.2,12.7,0.0,,carne|crudo|res
+F103,75,Chunchullo dorado,Chunchullo (fried beef intestine),341,24.5,1.7,26.2,0.0,,carne|frito|res
+F104,75,Churrasco de res asado,Grilled beef steak (churrasco),175,33.2,0.4,4.5,0.0,,carne|asado|res
+F107,75,Costilla de res cruda,"Beef ribs, raw",287,17.1,2.3,23.3,0.0,,carne|crudo|res
+F108,75,Hígado de res asado,"Beef liver, grilled",184,29.1,5.1,5.3,0.0,,carne|asado|res
+F113,75,Lengua de res cruda,"Beef tongue, raw",219,16.5,1.9,16.1,0.0,,carne|crudo|res
+F114,75,Lomo de res cocido,"Beef loin, cooked",218,36.1,0.5,7.9,0.0,,carne|cocido|res
+F118,77,Pierna de res cruda,"Beef round, raw",121,21.8,0.0,3.8,0.0,,carne|crudo|res
+F123,77,Sobrebarriga cocida,"Beef flank (sobrebarriga), cooked",331,24.2,0.0,26.0,0.0,,carne|cocido|res
+F125,77,Salchicha de cerdo y res,Pork and beef sausage,266,13.8,6.1,20.7,0.0,,carne|res|cerdo|embutido
+F126,77,Salchicha tipo frankfurt,Frankfurter sausage,271,13.5,2.2,23.1,0.0,,carne|embutido
+F127,77,Salchicha de pollo,Chicken sausage,248,13.8,0.0,21.4,0.0,,carne|pollo|embutido
+F130,77,Salchichón tradicional,Salchichon,243,15.5,0.5,19.9,0.0,,carne|embutido
+G001,79,Crema de leche,Heavy cream,330,2.1,1.7,35.0,0.0,,lacteo|leche
+G002,79,Kumis,Kumis (fermented milk),88,2.9,13.5,2.5,0.0,200,lacteo|leche
+G005,79,Leche condensada,Sweetened condensed milk,327,8.3,54.6,8.4,0.0,,lacteo|leche
+G006,79,Leche descremada en polvo,Skim milk powder,358,36.2,52.2,0.5,0.0,,lacteo|leche
+G007,79,Leche descremada,Skim milk,34,3.3,4.9,0.1,0.0,240,lacteo|leche
+G008,79,Leche entera en polvo,Whole milk powder,499,26.3,38.4,26.6,0.0,,lacteo|leche
+G012,79,Leche entera,Whole milk,55,3.2,3.4,3.2,0.0,240,lacteo|leche
+G014,79,Queso crema,Cream cheese,293,16.4,0.4,25.1,0.0,,lacteo|queso
+G015,79,Suero costeño,Suero costeno (sour cream),83,11.0,6.4,1.5,0.0,,lacteo
+G016,79,Cuajada,Cuajada (fresh curd cheese),207,15.2,2.0,15.4,0.0,,lacteo|queso
+G017,79,Queso campesino,Campesino cheese,301,17.5,0.3,25.5,0.0,,lacteo|queso
+G018,79,Queso costeño,Costeno cheese,303,17.5,0.9,25.5,0.0,,lacteo|queso
+G019,79,Queso mozzarella,Mozzarella cheese,296,22.9,3.1,21.4,0.0,,lacteo|queso
+G021,79,Queso doble crema,Doble crema cheese,286,23.4,5.9,18.7,0.0,,lacteo|queso
+G022,79,Queso cottage,Cottage cheese,101,12.5,2.6,4.5,0.0,,lacteo|queso
+G024,79,Queso parmesano,Parmesan cheese,389,35.8,3.1,26.0,0.0,,lacteo|queso
+G027,79,Queso holandés,Gouda-style cheese (holandes),348,24.9,3.5,26.0,0.0,,lacteo|queso
+G028,79,Yogur bebible entero con azúcar,"Drinkable yogurt, whole, sweetened",81,2.9,11.2,2.8,0.0,200,lacteo|leche
+H002,81,Agua de coco,Coconut water,14,0.3,3.2,0.0,0.0,,bebida
+H003,81,Avena en hojuelas en agua sin azúcar,"Oat drink in water, unsweetened",59,1.9,9.8,1.0,1.6,,bebida
+H005,81,Café (tinto) sin azúcar,"Black coffee (tinto), unsweetened",5,0.1,1.0,0.1,0.0,,bebida
+H006,81,Cerveza,Beer,38,0.4,2.1,0.0,0.0,,bebida
+H008,81,Gaseosa,Soda (soft drink),44,0.0,10.9,0.0,0.0,,bebida
+H012,81,Néctar de guayaba,Guava nectar,48,0.1,11.3,0.0,1.0,,bebida
+H013,81,Néctar de mango,Mango nectar,47,0.2,11.3,0.0,0.3,,bebida
+H014,81,Néctar de manzana,Apple nectar,44,0.2,10.9,0.0,,,bebida
+H018,81,Té sin azúcar,"Tea, unsweetened",4,0.1,1.0,0.0,0.0,,bebida
+J001,83,Huevo de codorniz,Quail egg,154,13.0,0.5,11.1,0.0,10,huevo
+J002,83,Clara de huevo,Egg white,47,10.8,0.6,0.2,0.0,33,huevo
+J003,83,Huevo cocido,Boiled egg,145,13.0,0.0,10.4,0.0,50,huevo|cocido
+J004,83,Huevo crudo,"Egg, raw",149,12.6,0.3,10.8,0.0,50,huevo|crudo
+J006,83,Huevo frito,Fried egg,208,17.1,2.0,14.6,0.0,50,huevo|frito
+J007,83,Huevo revuelto,Scrambled egg,152,10.2,2.3,11.4,0.0,60,huevo
+J008,83,Huevo tibio,Soft-boiled egg,143,13.0,0.0,10.1,0.0,50,huevo
+K001,85,Arequipe,Dulce de leche (arequipe),320,6.4,56.7,7.5,0.0,,dulce
+K002,85,Arroz con leche,Rice pudding,89,3.3,15.5,1.5,0.1,,dulce|leche|arroz
+K003,85,Azúcar blanca,White sugar,397,0.0,99.3,0.0,0.0,,dulce
+K004,85,Azúcar morena,Brown sugar,390,0.0,97.5,0.0,0.0,,dulce
+K005,85,Bocadillo de guayaba,Guava paste (bocadillo),332,0.4,79.6,0.5,3.7,,dulce
+K010,85,Chocolate de mesa en pastilla con azúcar,Table chocolate bar with sugar,466,3.6,75.5,16.6,,,dulce
+K012,85,Chocolatina (chocolate de leche),Milk chocolate,550,5.5,60.0,31.8,0.8,,dulce|leche
+K019,85,Gelatina preparada con azúcar,"Gelatin dessert, sweetened",67,1.4,15.4,0.0,0.0,,dulce
+K023,85,Helado de crema,Ice cream,196,3.2,22.8,10.3,0.0,,dulce
+K027,85,Masmelos,Marshmallows,334,1.8,81.3,0.2,0.1,,dulce
+K030,87,Mermelada,Jam,272,0.5,66.5,0.0,1.9,,dulce
+K031,87,Miel de abejas,Honey,332,0.6,82.4,0.0,0.0,,dulce
+K033,87,Panela,Panela (unrefined cane sugar),364,0.6,90.2,0.1,0.0,,dulce
+L005,89,Café soluble en polvo,Instant coffee powder,355,13.0,74.7,0.4,0.0,,otro
+L008,89,Chocolate amargo (negro),Dark chocolate,622,4.9,49.3,42.6,10.9,,otro
+L009,89,Cocoa en polvo sin azúcar,"Cocoa powder, unsweetened",488,19.5,59.7,10.8,37.0,,otro
+L016,89,Salsa de mostaza,Mustard,107,3.6,14.1,3.3,3.2,,otro
+L017,89,Salsa de tomate,Ketchup,109,1.3,25.0,0.3,0.8,,otro
+N002,91,Mayonesa baja en grasa,Light mayonnaise,308,1.0,4.1,32.0,0.0,,light
+N005,91,Yogur bebible descremado sin azúcar,"Drinkable yogurt, skim, unsweetened",49,3.7,7.9,0.3,0.0,200,light|leche
+N006,91,Yogur bebible semidescremado con azúcar,"Drinkable yogurt, low-fat, sweetened",99,4.0,18.1,1.1,0.3,200,light|leche
+S001,103,Ajiaco santafereño,Ajiaco (Bogota chicken potato soup),82,6.4,11.3,0.8,2.2,,preparado|sopa
+S002,103,Arroz atollado,Arroz atollado,119,10.1,9.2,4.3,1.7,,preparado|arroz
+S004,103,Bandeja paisa,Bandeja paisa,212,11.7,15.3,11,2.3,,preparado
+S005,103,Bollo limpio,Bollo limpio (corn roll),178,3.3,29.1,4.8,2.4,,preparado|envuelto
+S006,103,Carimañola con queso,Carimanola with cheese,295,5.8,28.6,17.4,,,preparado|queso
+S009,103,Chocolate en agua y leche (bebida),Hot chocolate (water and milk),89,3.4,10.3,3.6,1.0,,preparado|leche
+S011,103,Empanada de pipián frita,"Pipian empanada, fried",396,4.7,34.6,26.3,1.1,,preparado|frito
+S013,103,Envuelto de plátano maduro,Ripe plantain envuelto,158,1.6,37.6,0.1,0.3,,preparado|platano|envuelto
+S016,103,Guacamole,Guacamole,184,0.1,16.3,12.7,1.7,,preparado
+S017,103,Hamburguesa de res con vegetales,Beef burger with vegetables,252,11.7,23.1,12.3,1.1,,preparado|res
+S018,103,Lechona tolimense,Lechona (stuffed roast pork),242,21.8,10.2,12,2.9,,preparado|cerdo
+S019,103,Mazamorra chiquita,Mazamorra chiquita,115,9.8,6.1,5,3,,preparado
+S020,103,Mote de queso,Mote de queso (yam cheese soup),102,5.4,10.2,3.9,2.2,,preparado|queso|sopa
+S021,103,Mute santandereano,Mute santandereano,113,8.1,5.4,6.1,1.9,,preparado
+S023,103,Rundown,Rundown (coconut stew),136,8.2,20.2,2.1,1.7,,preparado
+S024,103,Sancocho de bagre,Catfish sancocho,134,16.9,1.6,6.3,1.5,,preparado|sopa
+S025,103,Sancocho valluno de gallina,Sancocho de gallina (Valle),121,16.4,4.2,4,1.3,,preparado|pollo|sopa
+S026,103,Sopa de arroz,Rice soup,68,3.7,8.4,2.2,,,preparado|arroz|sopa
+S029,105,Tamal de maíz y guiso,Corn tamale with stew,170,3.5,17.7,8.8,3.2,,preparado|envuelto
+S032,105,Tamal tolimense,Tamal tolimense,132,5.7,16.7,3.8,4,,preparado|envuelto
+S033,105,Viudo de bocachico,Viudo de bocachico,123,13.2,7.8,4.1,1.1,,preparado|pescado
+T001,107,Ajonjolí,Sesame seeds,646,20.4,18.2,52.2,11.8,,leguminosa
+T002,107,Arveja seca cocida,"Dried peas, cooked",138,8.1,22.4,0.4,6.0,,leguminosa|cocido|grano
+T004,107,Bebida de soya sin azúcar,"Soy milk, unsweetened",40,2.6,3.2,1.7,1.1,,leguminosa
+T005,107,Fríjol blanco crudo,"White beans, raw",373,21.3,61.8,1.1,15.1,,leguminosa|crudo|grano
+T009,107,Fríjol negro crudo,"Black beans, raw",386,22.8,59.0,1.7,21.6,,leguminosa|crudo|grano
+T010,107,Fríjol cargamanto rojo cocido,"Red cargamanto beans, cooked",161,8.1,26.9,0.6,7.6,,leguminosa|cocido|grano
+T011,107,Fríjol cargamanto rojo crudo,"Red cargamanto beans, raw",386,22.8,60.4,1.5,19.8,,leguminosa|crudo|grano
+T018,107,Garbanzo cocido,"Chickpeas, cooked",187,8.6,26.0,2.3,13.6,,leguminosa|cocido|grano
+T019,107,Garbanzo crudo,"Chickpeas, raw",393,19.9,58.8,5.5,14.3,,leguminosa|crudo|grano
+T023,107,Harina de garbanzo,Chickpea flour,403,22.4,57.9,6.7,10.8,,leguminosa|grano
+T025,107,Lenteja cocida,"Lentils, cooked",122,7.7,18.5,0.5,6.5,,leguminosa|cocido|grano
+T026,107,Lenteja cruda,"Lentils, raw",387,23.1,61.0,0.9,21.3,,leguminosa|crudo|grano
+T028,107,Maní con piel crudo,"Peanuts with skin, raw",619,27.3,15.8,47.8,8.3,,leguminosa|crudo
+T029,107,Maní tostado sin sal,"Peanuts, roasted, unsalted",650,25.9,19.2,50.4,7.8,,leguminosa
+T030,107,Soya cruda,"Soybeans, raw",479,36.5,28.8,20.7,15.7,,leguminosa|crudo
+T032,107,Tofu,Tofu,142,17.4,0.5,7.7,0.3,,leguminosa
