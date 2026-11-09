@@ -317,8 +317,12 @@ export function TodoRow({
                 onPressOut={() => setPressed(false)}
                 style={styles.labelTap}
                 accessibilityRole="button"
-                accessibilityLabel={`Editar ${todo.title}`}
-                accessibilityHint="Toca para cambiar el texto. Desliza a los lados para moverlo de día."
+                accessibilityLabel={readOnly ? todo.title : `Editar ${todo.title}`}
+                accessibilityHint={
+                  readOnly
+                    ? undefined
+                    : 'Toca para cambiar el texto. Desliza a los lados para moverlo de día.'
+                }
               >
                 <Text
                   numberOfLines={2}

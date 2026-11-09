@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, LayoutAnimation, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '../theme/Ionicons';
 import * as Haptics from '../utils/haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DayModeBar } from '../components/DayModeBar';
@@ -13,6 +12,7 @@ import { TaskCard } from '../components/TaskCard';
 import { TaskEditor } from '../components/TaskEditor';
 import { WeekStrip } from '../components/WeekStrip';
 import { shadow } from '../theme/shadows';
+import { useHeaderInset } from '../components/HeaderInset';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import type { DayModeMap } from '../storage/dayModes';
@@ -59,7 +59,7 @@ export function ScheduleScreen({
   readOnly = false,
 }: Props) {
   const { colors, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
+  const headerTop = useHeaderInset();
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<TaskInstance | null>(null);
@@ -180,7 +180,7 @@ export function ScheduleScreen({
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={[styles.header, { paddingTop: headerTop + spacing.sm }]}>
         <View style={styles.titleRow}>
           <View style={styles.titleBlock}>
             <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>
@@ -259,7 +259,12 @@ export function ScheduleScreen({
         ]}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListEmptyComponent={
-          dayMode === 'holiday' ? (
+          readOnly ? (
+            <EmptyState
+              title="Sin actividades este día"
+              description="No hay nada programado para este día."
+            />
+          ) : dayMode === 'holiday' ? (
             <EmptyState
               title="Día festivo"
               description="Hoy no hay actividades programadas. La racha no se afecta: sigue donde iba."

@@ -21,6 +21,7 @@ import { ProgressRing } from '../components/ProgressRing';
 import { TodoRow } from '../components/TodoRow';
 import { WeekStrip } from '../components/WeekStrip';
 import { shadow } from '../theme/shadows';
+import { useHeaderInset } from '../components/HeaderInset';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import type { Todo } from '../types/task';
@@ -65,6 +66,7 @@ export function TodosScreen({
 }: Props) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const headerTop = useHeaderInset();
   const [draft, setDraft] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<Todo | null>(null);
   const [movedNote, setMovedNote] = useState<string | null>(null);
@@ -239,7 +241,7 @@ export function TodosScreen({
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={[styles.header, { paddingTop: headerTop + spacing.sm }]}>
         <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>Pendientes</Text>
         <Text style={[styles.title, { color: colors.foreground }]}>
           {friendlyDate(selectedDate)}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TopInsetTakenProvider } from '../components/HeaderInset';
 import { PersonSwitcher } from '../components/PersonSwitcher';
 import { TabBar, type TabId } from '../components/TabBar';
 import { ViewingBanner } from '../components/ViewingBanner';
@@ -141,10 +142,14 @@ export function RootScreen() {
   // The tab badge always counts my own pending items.
   const pendingCount = store.getTodosForDay(dayKey).filter((t) => !t.done).length;
 
-  // With the switcher on top, it takes the status-bar inset and the screens
-  // below lay out as if the top edge were already clear.
+  // With the switcher on top, it takes the status-bar inset, so the tab
+  // headers (via useHeaderInset) skip it. Modals keep the real insets.
   const hasSwitcher = partnerView.partner !== null;
-  const bodyInsets = useMemo(() => ({ ...insets, top: 0 }), [insets]);
+  // FoodScreen reads useSafeAreaInsets directly for its header and is not ours
+  // to change here, so only its subtree gets top: 0. Everything it renders
+  // inside (MealEditor, Sheet, ConfirmDialog) uses only the bottom inset.
+  // TODO: switch FoodScreen to useHeaderInset and drop this override.
+  const foodInsets = useMemo(() => ({ ...insets, top: 0 }), [insets]);
 
   if (store.isLoading) {
     return (
@@ -163,7 +168,7 @@ export function RootScreen() {
         </View>
       ) : null}
 
-      <SafeAreaInsetsContext.Provider value={hasSwitcher ? bodyInsets : insets}>
+      <TopInsetTakenProvider value={hasSwitcher}>
         <View style={styles.body}>
           {tab === 'schedule' ? (
             <ScheduleScreen
@@ -200,14 +205,16 @@ export function RootScreen() {
           ) : null}
 
           {tab === 'food' ? (
-            <FoodScreen
-              selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
-              markedDays={markedDays}
-              nutrition={viewingPartner ? partnerNutrition : nutrition}
-              readOnly={viewingPartner}
-              onOpenProfile={viewingPartner ? noop : () => setTab('settings')}
-            />
+            <SafeAreaInsetsContext.Provider value={hasSwitcher ? foodInsets : insets}>
+              <FoodScreen
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                markedDays={markedDays}
+                nutrition={viewingPartner ? partnerNutrition : nutrition}
+                readOnly={viewingPartner}
+                onOpenProfile={viewingPartner ? noop : () => setTab('settings')}
+              />
+            </SafeAreaInsetsContext.Provider>
           ) : null}
 
           {tab === 'report' ? (
@@ -233,7 +240,7 @@ export function RootScreen() {
             />
           ) : null}
         </View>
-      </SafeAreaInsetsContext.Provider>
+      </TopInsetTakenProvider>
 
       <TabBar current={tab} onChange={setTab} pendingCount={pendingCount} />
     </View>

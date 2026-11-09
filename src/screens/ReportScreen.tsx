@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '../theme/Ionicons';
 import * as Haptics from '../utils/haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '../components/EmptyState';
 import { StreakCalendar } from '../components/StreakCalendar';
@@ -11,6 +10,7 @@ import { computeStats, type HabitScore } from '../storage/stats';
 import { categoryMeta, categoryTint } from '../theme/categories';
 import type { IconName } from '../theme/icons';
 import { shadow } from '../theme/shadows';
+import { useHeaderInset } from '../components/HeaderInset';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing } from '../theme/tokens';
 import type { Task, Todo } from '../types/task';
@@ -38,7 +38,7 @@ function verdict(rate: number, activeDays: number): { text: string; icon: IconNa
 
 export function ReportScreen({ tasks, todos, dayModes }: Props) {
   const { colors, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
+  const headerTop = useHeaderInset();
   const [windowDays, setWindowDays] = useState(30);
 
   const stats = useMemo(
@@ -101,7 +101,7 @@ export function ReportScreen({ tasks, todos, dayModes }: Props) {
       style={styles.root}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + spacing.lg, paddingBottom: spacing.xxl },
+        { paddingTop: headerTop + spacing.lg, paddingBottom: spacing.xxl },
       ]}
       showsVerticalScrollIndicator={false}
     >
