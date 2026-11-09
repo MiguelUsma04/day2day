@@ -1,10 +1,19 @@
 -- day2day · lectura compartida con la pareja en tasks, todos y day_modes
 --
--- NO es una migración: no va en supabase/migrations/. Se aplica en el momento
--- del despliegue, junto con el cliente nuevo. El cliente anterior hace pull
--- sin filtrar por user_id y se apoyaba en que el RLS solo devolvía filas
--- propias; con estas políticas también recibiría las filas de la pareja y las
--- mezclaría con las suyas.
+-- NO es una migración: no va en supabase/migrations/. Se aplica a mano, en el
+-- SQL Editor, después de desplegar el cliente nuevo.
+--
+-- CUÁNDO: solo DESPUÉS de que LOS DOS teléfonos hayan abierto la versión
+-- nueva. Compruébalo en cada app instalada: la pestaña "Comida" tiene que
+-- verse en ambas. Si una todavía no la muestra, ciérrala del todo y vuelve a
+-- abrirla (o recárgala) y espera a que aparezca antes de correr este archivo.
+--
+-- POR QUÉ: una PWA instalada que se retoma desde segundo plano sin recargar
+-- sigue ejecutando el bundle anterior aunque el despliegue ya esté hecho. Ese
+-- cliente viejo hace el pull sin filtrar por user_id y se apoyaba en que el
+-- RLS solo devolvía filas propias; con estas políticas recibiría también las
+-- filas de la pareja, las mezclaría en su almacenamiento local y luego
+-- intentaría subirlas como propias, con lo que fallaría cada flush.
 --
 -- Requiere haber aplicado antes 20261110000000_nutrition.sql (public.can_read).
 -- Reemplaza las políticas "for all" por una por operación: leer lo propio y

@@ -182,7 +182,9 @@ Aplica, además de las anteriores:
 - `20261110000000_nutrition.sql`: tablas nuevas, RLS, `partners` y la función `search_foods`. Es aditiva: no toca las tablas existentes, así que el cliente anterior sigue funcionando.
 - `20261110000001_foods_tcac.sql`: 314 alimentos de la TCAC.
 
-**Orden importante.** `supabase/deploy/partner_read.sql` no es una migración y no va en `db push`: se pega en el SQL Editor solo en el momento de desplegar el cliente nuevo. Cambia las políticas de `tasks`, `todos` y `day_modes` para que cada cuenta también lea las filas de su pareja. El cliente anterior hace el pull sin filtrar por `user_id` y se apoyaba en que el RLS solo devolvía filas propias; con esas políticas recibiría las de la pareja y las mezclaría con las suyas. Requiere haber aplicado antes `20261110000000_nutrition.sql` (usa `public.can_read`).
+**Orden importante.** `supabase/deploy/partner_read.sql` no es una migración y no va en `db push`: se pega a mano en el SQL Editor. Cambia las políticas de `tasks`, `todos` y `day_modes` para que cada cuenta también lea las filas de su pareja. Requiere haber aplicado antes `20261110000000_nutrition.sql` (usa `public.can_read`).
+
+**Cuándo correrlo: solo después de que LOS DOS teléfonos hayan abierto la versión nueva.** Compruébalo en cada app instalada: la pestaña **Comida** tiene que verse en ambas. Si en alguna todavía no aparece, ciérrala del todo y vuelve a abrirla (o recárgala) hasta que la muestre, y solo entonces corre el SQL. El motivo: una PWA instalada que se retoma desde segundo plano sin recargar sigue ejecutando el bundle anterior aunque el despliegue ya esté hecho. Ese cliente viejo hace el pull sin filtrar por `user_id` y se apoyaba en que el RLS solo devolvía filas propias; con las políticas nuevas recibiría las filas de la pareja, las mezclaría en su almacenamiento local y después fallaría cada flush al intentar subirlas como propias.
 
 **Alimentos USDA (opcional).** Amplía la tabla con alimentos genéricos de USDA FoodData Central, traducidos con Claude Haiku:
 
@@ -316,7 +318,7 @@ src/
 supabase/functions/push/  Edge Function de Web Push (subscribe, status, test, send)
 supabase/functions/nutrition/  Edge Function de análisis de comidas con Claude (analyze)
 supabase/migrations/      Esquema SQL (tablas, RLS), cron de envío y alimentos; `supabase db push`
-supabase/deploy/          SQL que se aplica a mano al desplegar (partner_read.sql)
+supabase/deploy/          SQL que se aplica a mano tras desplegar (partner_read.sql)
 supabase/seed/foods/      TCAC en CSV y generadores del SQL de alimentos (TCAC, USDA)
 supabase/config.toml      Config de la CLI (verify_jwt de la función)
 public/                   manifest.json, sw.js e íconos
