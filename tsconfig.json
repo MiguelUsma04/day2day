@@ -30,6 +30,7 @@
   "include": [
     "src",
     "App.tsx",
-    "vite.config.ts"
+    "vite.config.ts",
+    "vitest.config.ts"
   ]
 }
