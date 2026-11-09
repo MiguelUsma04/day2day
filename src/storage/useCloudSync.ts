@@ -287,11 +287,12 @@ export function useCloudSync({ userId, ready, bindings }: Args): CloudSync {
     const uid = userRef.current;
     if (!uid || !isSupabaseConfigured) return;
 
-    const cursorKey = `${CURSOR_KEY}:${uid}`;
+    const list = bindingsRef.current;
+    // Keyed by table list too: two hook instances (routine, nutrition) must not share a cursor.
+    const cursorKey = `${CURSOR_KEY}:${uid}:${list.map((b) => b.def.table).join(',')}`;
     const since = await AsyncStorage.getItem(cursorKey).catch(() => null);
     const firstPull = since === null;
 
-    const list = bindingsRef.current;
     const changes = await fetchChanges(
       since,
       uid,
