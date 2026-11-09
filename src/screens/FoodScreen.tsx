@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CheckInCard } from '../components/food/CheckInCard';
 import { EmptySlotRow } from '../components/food/EmptySlotRow';
 import { MealEditor, type MealEditorMode } from '../components/food/MealEditor';
+import { clearMealDraft, readMealDraft, type MealDraft } from '../components/food/mealDraft';
 import { MealRow } from '../components/food/MealRow';
 import { TotalsCards } from '../components/food/TotalsCards';
 import { WeekStrip } from '../components/WeekStrip';
@@ -17,7 +18,7 @@ import type { IconName } from '../theme/icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import { MEAL_SLOTS, type Meal, type MealSlot } from '../types/nutrition';
-import { addDays, friendlyDate, minutesSinceMidnight, toDayKey } from '../utils/date';
+import { addDays, friendlyDate, fromDayKey, minutesSinceMidnight, toDayKey } from '../utils/date';
 import * as Haptics from '../utils/haptics';
 import { playDelete } from '../utils/sound';
 
@@ -37,7 +38,7 @@ type Props = {
   onOpenProfile: () => void;
 };
 
-type EditorState = { mode: MealEditorMode; slot: MealSlot; meal?: Meal };
+type EditorState = { mode: MealEditorMode; slot: MealSlot; meal?: Meal; note?: string };
 
 type TimelineEntry =
   | { kind: 'meal'; minutes: number; meal: Meal }
@@ -48,6 +49,32 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
   const insets = useSafeAreaInsets();
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Meal | null>(null);
+  const [draft, setDraft] = useState<MealDraft | null>(null);
+
+  // A meal analysis interrupted by closing the app leaves a draft behind.
+  useEffect(() => {
+    if (readOnly) return;
+    let cancelled = false;
+    void readMealDraft().then((d) => {
+      if (!cancelled) setDraft(d);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [readOnly]);
+
+  const resumeDraft = useCallback(() => {
+    if (!draft) return;
+    onSelectDate(fromDayKey(draft.date));
+    // The photo is not kept; the note and slot are.
+    setEditor({ mode: 'text', slot: draft.slot, note: draft.note });
+    setDraft(null);
+  }, [draft, onSelectDate]);
+
+  const discardDraft = useCallback(() => {
+    void clearMealDraft();
+    setDraft(null);
+  }, []);
 
   const dayKey = toDayKey(selectedDate);
   const meals = useMemo(() => nutrition.getMealsForDay(dayKey), [nutrition.getMealsForDay, dayKey]);
@@ -136,6 +163,20 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {draft && !readOnly ? (
+          <View style={[styles.draft, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <Text style={[styles.draftText, { color: colors.foreground }]}>Tienes una comida sin terminar</Text>
+            <View style={styles.draftActions}>
+              <Pressable onPress={discardDraft} accessibilityRole="button" hitSlop={8}>
+                <Text style={[styles.draftLink, { color: colors.mutedForeground }]}>Descartar</Text>
+              </Pressable>
+              <Pressable onPress={resumeDraft} accessibilityRole="button" hitSlop={8}>
+                <Text style={[styles.draftLink, { color: colors.primary }]}>Continuar</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         <CheckInCard
           date={dayKey}
           weight={nutrition.getWeightFor(dayKey)}
@@ -210,6 +251,7 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
           onSave={saveMeal}
           onClose={() => setEditor(null)}
           onRememberPortion={nutrition.rememberPortion}
+          initialNote={editor.note}
         />
       ) : null}
     </View>
@@ -258,6 +300,15 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl, gap: spacing.lg },
   timeline: { gap: spacing.sm },
+  draft: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  draftText: { fontFamily: fontFamily.semibold, fontSize: fontSize.footnote },
+  draftActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.lg },
+  draftLink: { fontFamily: fontFamily.semibold, fontSize: fontSize.label },
   actions: {
     flexDirection: 'row',
     gap: spacing.sm,
