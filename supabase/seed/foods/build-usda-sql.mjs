@@ -296,14 +296,18 @@ export async function translateBatch(names, apiKey, fetchImpl = fetch) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4096,
+        // Haiku 5.5 piensa por defecto; el pensamiento cuenta en max_tokens.
+        max_tokens: 8000,
+        output_config: { effort: 'low' },
         messages: [{ role: 'user', content: translationPrompt(names) }],
       }),
     });
     if (!res.ok) throw new Error(`Anthropic respondió ${res.status}: ${await res.text()}`);
     const data = await res.json();
     try {
-      return parseTranslation(data?.content?.[0]?.text ?? '', names.length);
+      // La respuesta trae un bloque `thinking` antes del texto: buscar el de texto.
+      const text = (data?.content ?? []).find((b) => b?.type === 'text')?.text ?? '';
+      return parseTranslation(text, names.length);
     } catch (err) {
       lastError = err;
     }
