@@ -43,3 +43,4 @@ supabase/.branches/
 
 # PDF de la TCAC (fuente del seed; no se versiona)
 supabase/seed/foods/source/
+.claude/worktrees/
