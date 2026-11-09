@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -17,13 +17,15 @@ import type { IconName } from '../theme/icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import { MEAL_SLOTS, type Meal, type MealSlot } from '../types/nutrition';
-import { friendlyDate, minutesSinceMidnight, toDayKey } from '../utils/date';
+import { addDays, friendlyDate, minutesSinceMidnight, toDayKey } from '../utils/date';
 import * as Haptics from '../utils/haptics';
 import { playDelete } from '../utils/sound';
 
 /** Weight assumed for workout kcal until the user logs one. */
 const FALLBACK_WEIGHT_KG = 65;
-const RECENT_FOODS_LIMIT = 20;
+const RECENT_FOODS_LIMIT = 30;
+/** Today plus the previous 6 days. */
+const RECENT_FOODS_DAYS = 7;
 
 type Props = {
   selectedDate: Date;
@@ -68,7 +70,11 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
   const recentFoods = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
-    const sorted = [...nutrition.meals].sort((a, b) => b.updatedAt - a.updatedAt);
+    // Window is relative to today, not the selected day: these are suggestions for what is eaten lately.
+    const since = toDayKey(addDays(new Date(), -(RECENT_FOODS_DAYS - 1)));
+    const sorted = nutrition.meals
+      .filter((m) => m.date >= since)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.timeMinutes - a.timeMinutes || b.updatedAt - a.updatedAt);
     for (const meal of sorted) {
       for (const item of meal.items) {
         const key = item.name.trim().toLowerCase();
@@ -105,6 +111,15 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
     playDelete();
     setConfirmDelete(null);
   }, [confirmDelete, nutrition]);
+
+  // Until the stored data is loaded, an edit here would be overwritten by hydration.
+  if (nutrition.isLoading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -236,6 +251,7 @@ function CaptureButton({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { paddingHorizontal: spacing.lg, gap: spacing.xs, paddingBottom: spacing.xs },
   eyebrow: { fontFamily: fontFamily.medium, fontSize: fontSize.label, letterSpacing: 0.2 },
   title: { fontFamily: fontFamily.bold, fontSize: fontSize.headline, lineHeight: 36 },
