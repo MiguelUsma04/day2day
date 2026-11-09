@@ -44,6 +44,9 @@ const DAILY_ANALYSES = 40;
 const CALLS_PER_ANALYSIS = 2;
 const SEARCH_PER_TERM = 5;
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_TIMEOUT_MS = 60_000;
+const VISION_MAX_TOKENS = 2500;
+const CHOICE_MAX_TOKENS = 1500;
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -79,26 +82,38 @@ async function callTool(
   content: unknown[],
   tool: { name: string },
   usage: Usage[],
+  maxTokens: number,
 ): Promise<unknown> {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) throw new AnthropicError('missing key');
+  if (!apiKey) {
+    console.error('ANTHROPIC_API_KEY not set');
+    throw new AnthropicError('missing key');
+  }
 
-  const res = await fetch(ANTHROPIC_URL, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1500,
-      system,
-      tools: [tool],
-      tool_choice: { type: 'tool', name: tool.name },
-      messages: [{ role: 'user', content }],
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(ANTHROPIC_URL, {
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        tools: [tool],
+        tool_choice: { type: 'tool', name: tool.name },
+        messages: [{ role: 'user', content }],
+      }),
+    });
+  } catch (error: any) {
+    // Timeout or network failure; the error name says which, never the request.
+    console.error(`anthropic ${tool.name} request failed: ${error?.name ?? 'Error'}`);
+    throw new AnthropicError('request failed');
+  }
   if (!res.ok) {
     // Status only: the body may echo request details and is not needed here.
     console.error(`anthropic ${tool.name} failed with status ${res.status}`);
@@ -143,7 +158,8 @@ async function analysesToday(userId: string): Promise<number> {
     .eq('user_id', userId)
     .gte('created_at', startOfUtcDay());
   if (error) throw error;
-  return Math.floor((count ?? 0) / CALLS_PER_ANALYSIS);
+  // ceil: a lone billed vision call (choice never ran) still counts as an analysis.
+  return Math.ceil((count ?? 0) / CALLS_PER_ANALYSIS);
 }
 
 async function searchFoods(term: string): Promise<FoodHit[]> {
@@ -212,7 +228,7 @@ async function analyze(req: Request, userId: string): Promise<Response> {
     content.push({ type: 'text', text: userText(request) });
 
     const report = parseReportMeal(
-      await callTool(model, systemPrompt(request.hints), content, reportMealTool, usage),
+      await callTool(model, systemPrompt(request.hints), content, reportMealTool, usage, VISION_MAX_TOKENS),
     );
     if ('error' in report) {
       console.error(`report_meal invalid: ${report.error}`);
@@ -237,6 +253,7 @@ async function analyze(req: Request, userId: string): Promise<Response> {
         [{ type: 'text', text: JSON.stringify(choiceInput) }],
         chooseFoodsTool,
         usage,
+        CHOICE_MAX_TOKENS,
       ),
       items.length,
     );

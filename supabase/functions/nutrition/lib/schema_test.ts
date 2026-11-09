@@ -109,6 +109,31 @@ Deno.test('parseReportMeal drops a question with an out-of-range item or bad opt
   assertEquals(ok.question?.options[1].gramsMultiplier, 2);
 });
 
+Deno.test('parseReportMeal keeps the question on its item when an earlier item is dropped', () => {
+  const options = [{ label: 'a', grams_multiplier: 0.5 }, { label: 'b', grams_multiplier: 1.5 }];
+  const items = [item, { name_es: 'sin gramos' }, { ...item, name_es: 'Fríjoles' }, { ...item, name_es: 'Arepa' }];
+  const r = parseReportMeal({ items, question: { item_index: 2, text: '¿Cuántos fríjoles?', options } });
+  if (isError(r)) throw new Error(r.error);
+  assertEquals(r.items.length, 3);
+  assertEquals(r.question?.itemIndex, 1);
+  assertEquals(r.items[r.question!.itemIndex].name, 'Fríjoles');
+});
+
+Deno.test('parseReportMeal drops the question when its item was dropped or past the cap', () => {
+  const options = [{ label: 'a', grams_multiplier: 0.5 }, { label: 'b', grams_multiplier: 1.5 }];
+  const items = [item, 'basura', { ...item, name_es: 'Arepa' }];
+  const r = parseReportMeal({ items, question: { item_index: 1, text: '¿Cuánto?', options } });
+  if (isError(r)) throw new Error(r.error);
+  assertEquals(r.items.length, 2);
+  assertEquals(r.question, null);
+
+  const many = Array.from({ length: 22 }, (_, i) => ({ ...item, name_es: `x${i}` }));
+  const capped = parseReportMeal({ items: many, question: { item_index: 21, text: '¿Cuánto?', options } });
+  if (isError(capped)) throw new Error(capped.error);
+  assertEquals(capped.items.length, 20);
+  assertEquals(capped.question, null);
+});
+
 Deno.test('parseReportMeal rejects a payload without items', () => {
   assert(isError(parseReportMeal({ items: [] })));
   assert(isError(parseReportMeal(null)));

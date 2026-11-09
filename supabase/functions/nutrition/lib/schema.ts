@@ -166,7 +166,9 @@ function parseQuestion(v: unknown, itemCount: number): Question | null {
 export function parseReportMeal(toolInput: unknown): ReportedMeal | Invalid {
   if (!isObject(toolInput) || !Array.isArray(toolInput.items)) return { error: 'report_meal sin items' };
   const items: ReportedItem[] = [];
-  for (const raw of toolInput.items.slice(0, MAX_ITEMS)) {
+  /** Raw index → index in `items`, so the question follows its item when others are dropped. */
+  const kept = new Map<number, number>();
+  for (const [rawIndex, raw] of toolInput.items.slice(0, MAX_ITEMS).entries()) {
     if (!isObject(raw)) continue;
     const name = str(raw.name_es, 120);
     if (!name || !isNum(raw.grams)) continue;
@@ -176,6 +178,7 @@ export function parseReportMeal(toolInput: unknown): ReportedMeal | Invalid {
     const terms = Array.isArray(raw.search_terms)
       ? raw.search_terms.map((t) => str(t, 80)).filter((t): t is string => Boolean(t)).slice(0, 3)
       : [];
+    kept.set(rawIndex, items.length);
     items.push({
       name,
       nameEn: str(raw.name_en, 120) ?? name,
@@ -190,7 +193,15 @@ export function parseReportMeal(toolInput: unknown): ReportedMeal | Invalid {
   }
   if (!items.length) return { error: 'report_meal sin items' };
   // The tool allows a single question object, so there is never more than one.
-  return { items, question: parseQuestion(toolInput.question, items.length) };
+  return { items, question: remapQuestion(toolInput.question, kept) };
+}
+
+/** A question about a dropped (or past-the-cap) item is discarded, never moved to a neighbour. */
+function remapQuestion(v: unknown, kept: Map<number, number>): Question | null {
+  if (!isObject(v) || !Number.isInteger(v.item_index)) return null;
+  const itemIndex = kept.get(v.item_index as number);
+  if (itemIndex === undefined) return null;
+  return parseQuestion({ ...v, item_index: itemIndex }, kept.size);
 }
 
 function parseEstimate(v: unknown): Estimate | null {
