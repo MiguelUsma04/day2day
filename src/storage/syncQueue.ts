@@ -17,11 +17,19 @@ type Stored = Record<Table, Record<string, QueueOp>>;
 const KEY = 'day2day:syncQueue:v1';
 
 const queue = Object.fromEntries(TABLES.map((t) => [t, {}])) as Stored;
-let loaded = false;
+/**
+ * The one load, shared: every caller awaits the same promise, so none resumes
+ * before the stored entries are merged (a plain `loaded` flag set before the
+ * await let a second caller return early with an empty queue).
+ */
+let loading: Promise<void> | null = null;
 
-export async function loadQueue(): Promise<void> {
-  if (loaded) return;
-  loaded = true;
+export function loadQueue(): Promise<void> {
+  loading ??= readStored();
+  return loading;
+}
+
+async function readStored(): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return;
