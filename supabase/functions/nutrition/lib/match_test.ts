@@ -4,10 +4,11 @@ import {
   dedupeCandidates,
   fallbackFoodRef,
   type FoodHit,
+  questionForChosen,
   resolveChoices,
   rowToFoodRef,
 } from './match.ts';
-import type { ReportedItem } from './schema.ts';
+import { parseChooseFoods, type ReportedItem } from './schema.ts';
 
 function hit(id: string, similarity: number): FoodHit {
   return {
@@ -73,15 +74,50 @@ Deno.test('resolveChoices replaces an unknown id with the estimate, else the bes
     ],
     [[hit('a', 0.9)], [hit('a', 0.9), hit('b', 0.3)], [hit('a', 0.9), hit('b', 0.3)]],
   );
-  if ('error' in out) throw new Error(out.error);
   assertEquals(out[0], { itemIndex: 0, foodId: null, estimate });
   assertEquals(out[1].foodId, 'a');
   assertEquals(out[2].foodId, 'b');
 });
 
-Deno.test('resolveChoices fails when nothing usable is left', () => {
-  const out = resolveChoices([{ itemIndex: 0, foodId: 'made-up' }], [[]]);
-  assert('error' in out);
+Deno.test('resolveChoices: null foodId without estimate falls back to the top candidate', () => {
+  const out = resolveChoices([{ itemIndex: 0, foodId: null }], [[hit('a', 0.9), hit('b', 0.3)]]);
+  assertEquals(out, [{ itemIndex: 0, foodId: 'a' }]);
+});
+
+Deno.test('resolveChoices drops an item with no estimate and no candidates, keeping the others', () => {
+  const out = resolveChoices(
+    [
+      { itemIndex: 0, foodId: 'a' },
+      { itemIndex: 1, foodId: null },
+      { itemIndex: 2, foodId: 'made-up' },
+    ],
+    [[hit('a', 0.9)], [], [hit('c', 0.5)]],
+  );
+  assertEquals(out, [{ itemIndex: 0, foodId: 'a' }, { itemIndex: 2, foodId: 'c' }]);
+
+  const second: ReportedItem = { ...reported, name: 'Arepa' };
+  const third: ReportedItem = { ...reported, name: 'Fríjoles' };
+  const items = applyChoice([reported, second, third], out, new Map(), [[hit('a', 0.9)], [], [hit('c', 0.5)]]);
+  assertEquals(items.map((i) => i.name), ['Chicharrón', 'Fríjoles']);
+  assertEquals(items.map((i) => i.food.id), ['a', 'c']);
+});
+
+Deno.test('resolveChoices: an out-of-range estimate (parsed as absent) falls back to the top candidate', () => {
+  const raw = parseChooseFoods(
+    { choices: [{ itemIndex: 0, foodId: null, estimate: { kcal: 2000, protein_g: 1, carbs_g: 1, fat_g: 1 } }] },
+    1,
+  );
+  if ('error' in raw) throw new Error(raw.error);
+  assertEquals(resolveChoices(raw, [[hit('a', 0.9)]]), [{ itemIndex: 0, foodId: 'a' }]);
+  assertEquals(resolveChoices(raw, [[]]), []);
+});
+
+Deno.test('questionForChosen follows its item past dropped ones and is null for a dropped item', () => {
+  const question = { itemIndex: 2, text: '¿Cuánto?', options: [{ label: 'a', gramsMultiplier: 1 }] };
+  const choices = [{ itemIndex: 0, foodId: 'a' }, { itemIndex: 2, foodId: 'c' }];
+  assertEquals(questionForChosen(question, choices)?.itemIndex, 1);
+  assertEquals(questionForChosen({ ...question, itemIndex: 1 }, choices), null);
+  assertEquals(questionForChosen(null, choices), null);
 });
 
 Deno.test('rowToFoodRef maps snake_case macros to per100', () => {

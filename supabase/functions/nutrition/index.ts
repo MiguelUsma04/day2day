@@ -26,7 +26,14 @@ import {
   parseReportMeal,
 } from './lib/schema.ts';
 import { CHOICE_SYSTEM, chooseFoodsTool, reportMealTool, systemPrompt, userText } from './lib/prompt.ts';
-import { applyChoice, dedupeCandidates, fallbackFoodRef, type FoodHit, resolveChoices } from './lib/match.ts';
+import {
+  applyChoice,
+  dedupeCandidates,
+  fallbackFoodRef,
+  type FoodHit,
+  questionForChosen,
+  resolveChoices,
+} from './lib/match.ts';
 
 // Model ids: the owner must confirm them against `GET /v1/models` before deploying.
 const VISION_MODEL = 'claude-sonnet-5-5';
@@ -45,8 +52,10 @@ const CALLS_PER_ANALYSIS = 2;
 const SEARCH_PER_TERM = 5;
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_TIMEOUT_MS = 60_000;
-const VISION_MAX_TOKENS = 2500;
-const CHOICE_MAX_TOKENS = 1500;
+/** Thinking is on by default on these models and its tokens count against max_tokens. */
+const VISION_MAX_TOKENS = 8000;
+const CHOICE_MAX_TOKENS = 4000;
+const EFFORT = 'low';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -71,7 +80,7 @@ function json(body: unknown, status = 200): Response {
 
 // ---------------------------------------------------------------- anthropic
 
-/** Anthropic answered non-2xx or without the forced tool call. */
+/** Anthropic answered non-2xx, refused, or answered without calling the tool. */
 class AnthropicError extends Error {}
 
 type Usage = { model: string; input_tokens: number; output_tokens: number };
@@ -105,7 +114,10 @@ async function callTool(
         max_tokens: maxTokens,
         system,
         tools: [tool],
-        tool_choice: { type: 'tool', name: tool.name },
+        // Forced tool_choice ('tool' / 'any') is a 400 on these models: 'auto'
+        // plus the system prompt's "respond only with the tool" instruction.
+        tool_choice: { type: 'auto' },
+        output_config: { effort: EFFORT },
         messages: [{ role: 'user', content }],
       }),
     });
@@ -127,6 +139,11 @@ async function callTool(
     input_tokens: Number(data?.usage?.input_tokens) || 0,
     output_tokens: Number(data?.usage?.output_tokens) || 0,
   });
+  if (data?.stop_reason === 'refusal') {
+    // The category only: the explanation may paraphrase the request.
+    console.error(`anthropic ${tool.name} refused (category ${data?.stop_details?.category ?? 'none'})`);
+    throw new AnthropicError('refusal');
+  }
   const block = Array.isArray(data?.content)
     ? data.content.find((b: any) => b?.type === 'tool_use' && b?.name === tool.name)
     : null;
@@ -257,9 +274,14 @@ async function analyze(req: Request, userId: string): Promise<Response> {
       ),
       items.length,
     );
-    const choices: Choice[] | { error: string } = 'error' in raw ? raw : resolveChoices(raw, candidates);
-    if ('error' in choices) {
-      console.error(`choose_foods invalid: ${choices.error}`);
+    if ('error' in raw) {
+      console.error(`choose_foods invalid: ${raw.error}`);
+      return json({ error: 'No se pudo analizar la comida' }, 502);
+    }
+    // Items with neither a usable row nor an estimate are dropped here.
+    const choices: Choice[] = resolveChoices(raw, candidates);
+    if (!choices.length) {
+      console.error('choose_foods left no usable item');
       return json({ error: 'No se pudo analizar la comida' }, 502);
     }
 
@@ -275,7 +297,7 @@ async function analyze(req: Request, userId: string): Promise<Response> {
     const response: AnalyzeResponse = {
       analysisId: crypto.randomUUID(),
       items: applyChoice(items, choices, created, candidates),
-      question,
+      question: questionForChosen(question, choices),
       model,
     };
     return json(response);
@@ -291,13 +313,14 @@ async function analyze(req: Request, userId: string): Promise<Response> {
 // ------------------------------------------------------------------- router
 
 async function userIdFrom(req: Request): Promise<string | null> {
-  const authorization = req.headers.get('authorization');
-  if (!authorization || !/^Bearer\s+\S+/i.test(authorization)) return null;
+  const match = /^Bearer\s+(\S+)\s*$/i.exec(req.headers.get('authorization') ?? '');
+  if (!match) return null;
+  const jwt = match[1];
   const client = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: authorization } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data, error } = await client.auth.getUser();
+  // Explicit token: getUser() without it reads the (empty) client session.
+  const { data, error } = await client.auth.getUser(jwt);
   if (error || !data?.user) return null;
   return data.user.id;
 }

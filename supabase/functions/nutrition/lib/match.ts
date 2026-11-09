@@ -4,7 +4,7 @@
  * choice call estimates when no candidate fits.
  */
 
-import type { AnalyzedItem, Choice, Estimate, FoodRef, FoodSource, ReportedItem } from './schema.ts';
+import type { AnalyzedItem, Choice, Estimate, FoodRef, FoodSource, Question, ReportedItem } from './schema.ts';
 
 /** One row of `search_foods(q, n)`. Postgres numerics may arrive as strings. */
 export type FoodHit = {
@@ -70,10 +70,11 @@ export function fallbackFoodRef(estimate: Estimate, name: string): FoodRef {
 
 /**
  * Makes every choice point at one of the item's own candidates or at an
- * estimate. An id the model made up is replaced by its estimate when it gave
- * one, otherwise by the best candidate; with neither, the analysis fails.
+ * estimate. An id the model made up (or a null id without a usable estimate)
+ * falls back to the estimate when there is one, otherwise to the best
+ * candidate; an item with neither is dropped instead of failing the meal.
  */
-export function resolveChoices(choices: Choice[], candidates: FoodHit[][]): Choice[] | { error: string } {
+export function resolveChoices(choices: Choice[], candidates: FoodHit[][]): Choice[] {
   const out: Choice[] = [];
   for (const c of choices) {
     const own = candidates[c.itemIndex] ?? [];
@@ -83,16 +84,26 @@ export function resolveChoices(choices: Choice[], candidates: FoodHit[][]): Choi
       out.push({ itemIndex: c.itemIndex, foodId: null, estimate: c.estimate });
     } else if (own.length) {
       out.push({ itemIndex: c.itemIndex, foodId: own[0].id });
-    } else {
-      return { error: `Sin alimento para el ítem ${c.itemIndex}` };
     }
   }
   return out;
 }
 
 /**
- * Joins reported items with their chosen food. `created` holds the fallback
- * refs (already stored in `user_foods`) for the items whose choice was null.
+ * Re-points the question at its item once dropped items are gone (applyChoice
+ * keeps the chosen items in order). A question about a dropped item is null.
+ */
+export function questionForChosen(question: Question | null, choices: Choice[]): Question | null {
+  if (!question) return null;
+  const kept = choices.map((c) => c.itemIndex).sort((a, b) => a - b);
+  const itemIndex = kept.indexOf(question.itemIndex);
+  return itemIndex === -1 ? null : { ...question, itemIndex };
+}
+
+/**
+ * Joins reported items with their chosen food, in order, skipping the items
+ * resolveChoices dropped. `created` holds the fallback refs (already stored in
+ * `user_foods`) for the items whose choice was null.
  */
 export function applyChoice(
   items: ReportedItem[],
@@ -101,10 +112,12 @@ export function applyChoice(
   candidates: FoodHit[][],
 ): AnalyzedItem[] {
   const byIndex = new Map(choices.map((c) => [c.itemIndex, c]));
-  return items.map((item, i) => {
+  const out: AnalyzedItem[] = [];
+  items.forEach((item, i) => {
     const choice = byIndex.get(i);
+    if (!choice) return;
     let food: FoodRef | undefined;
-    if (choice?.foodId) {
+    if (choice.foodId) {
       const row = (candidates[i] ?? []).find((h) => h.id === choice.foodId);
       if (row) food = rowToFoodRef(row);
     } else {
@@ -112,6 +125,7 @@ export function applyChoice(
     }
     if (!food) throw new Error(`No food for item ${i}`);
     const { searchTerms: _searchTerms, ...rest } = item;
-    return { ...rest, food };
+    out.push({ ...rest, food });
   });
+  return out;
 }

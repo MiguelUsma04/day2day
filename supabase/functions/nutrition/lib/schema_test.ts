@@ -139,8 +139,38 @@ Deno.test('parseReportMeal rejects a payload without items', () => {
   assert(isError(parseReportMeal(null)));
 });
 
-Deno.test('parseChooseFoods rejects a null foodId without estimate', () => {
-  assert(isError(parseChooseFoods({ choices: [{ itemIndex: 0, foodId: null }] }, 1)));
+Deno.test('parseReportMeal accepts the strict-mode nulls (cooking and question)', () => {
+  const r = parseReportMeal({ items: [{ ...item, cooking: null }], question: null });
+  if (isError(r)) throw new Error(r.error);
+  assertEquals(r.items[0].cooking, null);
+  assertEquals(r.question, null);
+});
+
+Deno.test('parseChooseFoods keeps a null foodId without estimate (resolveChoices decides)', () => {
+  const r = parseChooseFoods({ choices: [{ itemIndex: 0, foodId: null, estimate: null }] }, 1);
+  if (isError(r)) throw new Error(r.error);
+  assertEquals(r, [{ itemIndex: 0, foodId: null }]);
+  const missing = parseChooseFoods({ choices: [{ itemIndex: 0, foodId: null }] }, 1);
+  if (isError(missing)) throw new Error(missing.error);
+  assertEquals(missing[0].estimate, undefined);
+});
+
+Deno.test('parseChooseFoods treats an out-of-range estimate as absent', () => {
+  const r = parseChooseFoods({
+    choices: [
+      { itemIndex: 0, foodId: null, estimate: { kcal: 950, protein_g: 5, carbs_g: 30, fat_g: 12 } },
+      { itemIndex: 1, foodId: null, estimate: { kcal: 300, protein_g: 120, carbs_g: 0, fat_g: 0 } },
+      { itemIndex: 2, foodId: null, estimate: { kcal: 300, protein_g: 50, carbs_g: 40, fat_g: 20 } },
+    ],
+  }, 3);
+  if (isError(r)) throw new Error(r.error);
+  assertEquals(r.map((c) => c.estimate), [undefined, undefined, undefined]);
+});
+
+Deno.test('parseChooseFoods drops estimate: null next to a chosen id', () => {
+  const r = parseChooseFoods({ choices: [{ itemIndex: 0, foodId: 'tcac:1', estimate: null }] }, 1);
+  if (isError(r)) throw new Error(r.error);
+  assertEquals(r, [{ itemIndex: 0, foodId: 'tcac:1' }]);
 });
 
 Deno.test('parseChooseFoods accepts ids and estimates and rejects out-of-range indexes', () => {

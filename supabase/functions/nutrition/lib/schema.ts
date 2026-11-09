@@ -162,7 +162,10 @@ function parseQuestion(v: unknown, itemCount: number): Question | null {
   return { itemIndex: itemIndex as number, text, options };
 }
 
-/** Validates `report_meal`. Grams are clamped, a bad question is dropped rather than failing the meal. */
+/**
+ * Validates `report_meal`. Grams are clamped, a bad question is dropped rather
+ * than failing the meal. Nullable fields (`cooking`, `question`) may be null.
+ */
 export function parseReportMeal(toolInput: unknown): ReportedMeal | Invalid {
   if (!isObject(toolInput) || !Array.isArray(toolInput.items)) return { error: 'report_meal sin items' };
   const items: ReportedItem[] = [];
@@ -204,16 +207,26 @@ function remapQuestion(v: unknown, kept: Map<number, number>): Question | null {
   return parseQuestion({ ...v, item_index: itemIndex }, kept.size);
 }
 
+const MAX_KCAL_PER_100G = 900;
+const MAX_MACROS_PER_100G = 100;
+
+/** null (or out of range: over 900 kcal or 100 g of macros per 100 g) means "no estimate". */
 function parseEstimate(v: unknown): Estimate | null {
   if (!isObject(v)) return null;
   const { kcal, protein_g, carbs_g, fat_g } = v;
   if (!isNum(kcal) || !isNum(protein_g) || !isNum(carbs_g) || !isNum(fat_g)) return null;
-  if (kcal < 0 || kcal > 900 || protein_g < 0 || carbs_g < 0 || fat_g < 0) return null;
-  if (protein_g + carbs_g + fat_g > 100) return null;
+  if (kcal < 0 || kcal > MAX_KCAL_PER_100G) return null;
+  const macros = [protein_g, carbs_g, fat_g];
+  if (macros.some((m) => m < 0 || m > MAX_MACROS_PER_100G)) return null;
+  if (protein_g + carbs_g + fat_g > MAX_MACROS_PER_100G) return null;
   return { kcal, protein_g, carbs_g, fat_g };
 }
 
-/** Validates `choose_foods`: exactly one choice per item; a null id must carry an estimate. */
+/**
+ * Validates `choose_foods`: exactly one choice per item. A null id without a
+ * usable estimate is kept as is; resolveChoices falls back to the top
+ * candidate or drops the item, so one weak answer never fails the meal.
+ */
 export function parseChooseFoods(toolInput: unknown, itemCount: number): Choice[] | Invalid {
   if (!isObject(toolInput) || !Array.isArray(toolInput.choices)) return { error: 'choose_foods sin choices' };
   const byIndex = new Map<number, Choice>();
@@ -224,8 +237,8 @@ export function parseChooseFoods(toolInput: unknown, itemCount: number): Choice[
       return { error: 'itemIndex fuera de rango' };
     }
     const foodId = typeof raw.foodId === 'string' && raw.foodId ? raw.foodId : null;
+    // Strict mode sends `estimate: null` when a row was chosen; parseEstimate maps it to null.
     const estimate = parseEstimate(raw.estimate);
-    if (foodId === null && !estimate) return { error: 'foodId null sin estimate' };
     byIndex.set(itemIndex as number, { itemIndex: itemIndex as number, foodId, ...(estimate ? { estimate } : {}) });
   }
   if (byIndex.size !== itemCount) return { error: 'Faltan elecciones' };
