@@ -6,3 +6,8 @@ project_id = "day2day"
 # Auth is done inside the function (anon key for the app, service role for the
 # cron), so the gateway must not reject requests that carry no user JWT.
 verify_jwt = false
+
+[functions.nutrition]
+# The function verifies the user JWT itself (auth.getUser) and answers CORS
+# preflights, so the gateway must let requests through unchecked.
+verify_jwt = false
