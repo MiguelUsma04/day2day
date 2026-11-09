@@ -38,6 +38,7 @@ export type PartnerSnapshot = {
 };
 
 const OFFLINE_TODO = 'Sin conexión: el pendiente no se creó';
+const TODO_FAILED = 'No se pudo crear el pendiente';
 
 function looksOffline(message: string | undefined): boolean {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
@@ -96,7 +97,10 @@ export async function insertTodoFor(
     throw new Error(OFFLINE_TODO);
   }
   if (result.error) {
-    throw new Error(looksOffline(result.error.message) ? OFFLINE_TODO : (result.error.message ?? OFFLINE_TODO));
+    if (looksOffline(result.error.message)) throw new Error(OFFLINE_TODO);
+    // E.g. an RLS rejection: the detail is for debugging, not for the banner.
+    console.warn('insertTodoFor failed', result.error);
+    throw new Error(TODO_FAILED);
   }
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Meal } from '../types/nutrition';
@@ -116,6 +116,17 @@ describe('insertTodoFor', () => {
     await expect(insertTodoFor('p1', todo, client)).rejects.toThrow(
       'Sin conexión: el pendiente no se creó',
     );
+  });
+
+  test('any other failure (e.g. RLS) gives the generic message', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { client } = fakeClient({
+      data: null,
+      error: { code: '42501', message: 'new row violates row-level security policy' },
+    });
+    await expect(insertTodoFor('p1', todo, client)).rejects.toThrow('No se pudo crear el pendiente');
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   test('without a client it is offline too', async () => {

@@ -24,6 +24,7 @@ import {
 import { accountFor } from '../auth/accounts';
 import { useAuth } from '../auth/AuthProvider';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useHeaderInset } from '../components/HeaderInset';
 import type { CloudSync } from '../storage/useCloudSync';
 import type { NutritionStore } from '../storage/useNutrition';
 import { ProfileScreen } from './ProfileScreen';
@@ -155,6 +156,7 @@ export function SettingsScreen({
 }: Props) {
   const { colors, isDark, themeId, mode, options, setThemeId, setMode } = useTheme();
   const insets = useSafeAreaInsets();
+  const headerTop = useHeaderInset();
   const auth = useAuth();
 
   const [authBusy, setAuthBusy] = useState(false);
@@ -399,7 +401,7 @@ export function SettingsScreen({
       style={styles.root}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.xxl },
+        { paddingTop: headerTop + spacing.lg, paddingBottom: insets.bottom + spacing.xxl },
       ]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
