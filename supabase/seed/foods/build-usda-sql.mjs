@@ -198,9 +198,9 @@ export function rowToSql(row) {
     "'usda'",
     text(String(row.fdc_id)),
     num(round(row.kcal), { required: true }),
-    num(round(row.protein_g)),
-    num(round(row.carbs_g)),
-    num(round(row.fat_g)),
+    num(round(row.protein_g), { required: true }),
+    num(round(row.carbs_g), { required: true }),
+    num(round(row.fat_g), { required: true }),
     num(round(row.fiber_g)),
     'null',
     "'{}'",
@@ -246,11 +246,16 @@ export function selectFoods({ foodCsv, categoryCsv, nutrientCsv }) {
     amounts.get(n.fdc_id)[n.nutrient_id] = n.amount;
   }
   const foods = [];
+  let dropped = 0;
   for (const [fdcId, f] of kept) {
     const picked = pickNutrients(amounts.get(fdcId) ?? {});
-    if (picked.kcal === null) continue;
+    if ([picked.kcal, picked.protein_g, picked.carbs_g, picked.fat_g].some((v) => v === null)) {
+      dropped++;
+      continue;
+    }
     foods.push({ fdc_id: fdcId, description: f.description, ...picked });
   }
+  if (dropped > 0) console.error(`${dropped} alimentos descartados por faltar kcal, proteína, carbohidratos o grasa`);
   return foods;
 }
 
@@ -268,7 +273,10 @@ function translationPrompt(names) {
 
 function parseTranslation(raw, expected) {
   const cleaned = String(raw).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  const arr = JSON.parse(cleaned);
+  const start = cleaned.indexOf('[');
+  const end = cleaned.lastIndexOf(']');
+  if (start < 0 || end < start) throw new Error('La respuesta no contiene un arreglo JSON');
+  const arr = JSON.parse(cleaned.slice(start, end + 1));
   if (!Array.isArray(arr) || arr.length !== expected || arr.some((s) => typeof s !== 'string' || !s.trim())) {
     throw new Error(`La traducción debe ser un arreglo de ${expected} strings no vacíos`);
   }

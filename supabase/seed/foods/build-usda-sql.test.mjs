@@ -54,16 +54,32 @@ describe('pickNutrients', () => {
 });
 
 describe('selectFoods', () => {
-  it('cruza tablas y omite alimentos sin kcal', () => {
+  it('cruza tablas y omite alimentos sin kcal o sin algún macro', () => {
     const foods = selectFoods({
       categoryCsv: 'id,code,description\n5,0500,Poultry Products\n9,0900,Fast Foods\n',
-      foodCsv:
-        'fdc_id,data_type,description,food_category_id,publication_date\n1,sr_legacy_food,Chicken breast,5,2019\n2,sr_legacy_food,Burger,9,2019\n3,sr_legacy_food,Chicken no kcal,5,2019\n',
-      nutrientCsv:
-        'id,fdc_id,nutrient_id,amount\n1,1,1008,165\n2,1,1003,31\n3,2,1008,300\n4,3,1003,10\n',
+      foodCsv: [
+        'fdc_id,data_type,description,food_category_id,publication_date',
+        '1,sr_legacy_food,Chicken breast,5,2019',
+        '2,sr_legacy_food,Burger,9,2019',
+        '3,sr_legacy_food,Chicken no kcal,5,2019',
+        '4,sr_legacy_food,Chicken no macros,5,2019',
+        '',
+      ].join('\n'),
+      nutrientCsv: [
+        'id,fdc_id,nutrient_id,amount',
+        '1,1,1008,165',
+        '2,1,1003,31',
+        '3,1,1005,0',
+        '4,1,1004,3.6',
+        '5,2,1008,300',
+        '6,3,1003,10',
+        '7,4,1008,50',
+        '8,4,1003,1',
+        '',
+      ].join('\n'),
     });
     expect(foods).toEqual([
-      { fdc_id: '1', description: 'Chicken breast', kcal: 165, protein_g: 31, carbs_g: null, fat_g: null, fiber_g: null },
+      { fdc_id: '1', description: 'Chicken breast', kcal: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6, fiber_g: null },
     ]);
   });
 });
@@ -92,6 +108,13 @@ describe('rowToSql', () => {
     expect(sql).toContain(`'Leche d''vaca'`);
     expect(sql).toContain(`'Milk, cow''s'`);
     expect(sql).toContain(`'usda', '99', 61, 3.2, 4.8, 3.3, null, null, '{}', false, true)`);
+  });
+
+  it('falla si falta un macro obligatorio', () => {
+    const base = { fdc_id: '1', name_es: 'a', name_en: 'a', kcal: 1, protein_g: 1, carbs_g: 1, fat_g: 1 };
+    for (const k of ['protein_g', 'carbs_g', 'fat_g']) {
+      expect(() => rowToSql({ ...base, [k]: null })).toThrow();
+    }
   });
 
   it('buildSql rechaza ids duplicados', () => {
@@ -123,6 +146,12 @@ describe('translateBatch', () => {
     };
     await expect(translateBatch(['a', 'b'], 'k', fetchImpl)).rejects.toThrow(/inválida/);
     expect(n).toBe(2);
+  });
+
+  it('extrae el arreglo aunque venga con texto o cercas de código', async () => {
+    const reply = ['Claro:', '```json', '["uno", "dos"]', '```', 'Listo.'].join('\n');
+    const fetchImpl = async () => okResponse(reply);
+    expect(await translateBatch(['a', 'b'], 'k', fetchImpl)).toEqual(['uno', 'dos']);
   });
 
   it('se recupera si el reintento sí es válido', async () => {
