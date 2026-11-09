@@ -20,6 +20,10 @@ PWA web pura: React + react-native-web empaquetados con Vite, instalable en el i
 - **Reporte de constancia**: porcentaje cumplido, rachas, días perfectos, calendario de los últimos días y qué hábitos se te dan mejor o peor.
 - **Seis temas de color** (azul, rosa, lila, ámbar, verde, coral) que tiñen toda la interfaz —fondo, tarjetas y bordes incluidos—, más modo claro/oscuro/automático.
 - **Progreso diario** y marcador **"Ahora"** sobre la actividad en curso.
+- **Comida**: una pestaña para registrar lo que comes con una foto o con texto. Claude identifica los alimentos y los gramos; las kcal y los macros salen siempre de la tabla de alimentos (TCAC colombiana y USDA), nunca del modelo. Hace como máximo una pregunta, con chips para responder. El aceite de cocción va como ítem aparte, los gramos se editan para ajustarlos con la gramera y los totales del día se comparan con la meta. La foto no se guarda.
+- **Check-in diario**: peso, sueño y entreno del día.
+- **Perfil y metas**: la meta diaria sale de una fórmula de gasto (Katch-McArdle si hay % de grasa medido, Mifflin-St Jeor si no), nunca baja de 1.200 kcal (mujer) ni 1.500 kcal (hombre), el ritmo semanal se limita a un rango según el objetivo y la proteína se calcula por kg según el objetivo (1,8 al bajar grasa, 1,6 al mantener, 2,0 al ganar músculo, salvo que se fije otra).
+- **Ver a la pareja**: en solo lectura. Se puede abrir su cronograma, pendientes y comida, y agregarle pendientes.
 - **Dos cuentas, cerradas**: Miguel y Karen. Al abrir la app por primera vez en un dispositivo se toca el nombre y se escribe la contraseña; la sesión queda guardada y no vuelve a pedirla. No hay registro abierto. Los datos se sincronizan con Supabase y aparecen en cualquier dispositivo; lo que ya tenías en el teléfono se sube solo la primera vez.
 
 ## Formato de importación
@@ -84,6 +88,38 @@ Cada sábado y domingo se marca desde el cronograma, en el selector bajo la tira
 
 > Genera un JSON con mi cronograma diario siguiendo este formato: una lista en la propiedad `tasks`, donde cada entrada tiene `title`, `time` en formato `"HH:MM"` de 24 horas, `duration` en minutos, `category` (`work`, `personal`, `health`, `study` u `other`), `icon` (nombre de Ionicons), `repeat` (`none`, `daily`, `weekdays` o `custom`), y `days` solo si es `custom`. Añade `reminder` con los minutos de antelación donde quiera un aviso.
 
+## Comida y cuerpo
+
+Flujo de una comida, de punta a punta:
+
+1. En la pestaña **Comida** se toca un hueco (desayuno, almuerzo, etc.) y se toma o elige una foto, o se escribe lo que se comió.
+2. La app llama a la Edge Function `nutrition`, que manda la foto (o el texto) a Claude para que devuelva solo alimentos y gramos.
+3. Por cada alimento, la función busca candidatos en la tabla `foods` con `search_foods` y una segunda llamada, más barata, elige el que corresponde. Las kcal y los macros se leen de esa fila. Si no hay candidato, el alimento queda como estimado por IA (`verified = false`) y se guarda en `user_foods`.
+4. Si algo es ambiguo, la respuesta trae una sola pregunta con chips. El aceite o la grasa de cocción aparece como ítem aparte.
+5. Se revisa y se editan los gramos (por ejemplo, tras pesar en la gramera) antes de guardar; los totales se recalculan en el dispositivo desde la tabla, no desde el modelo.
+
+Qué se guarda (todo con RLS: cada cuenta solo escribe lo suyo y la pareja puede leerlo):
+
+| Tabla | Contenido |
+|---|---|
+| `meals` | Una comida con sus ítems en `jsonb` |
+| `weights` | Pesos del check-in |
+| `sleep_logs` | Sueño |
+| `workouts` | Entrenos |
+| `profiles` | Perfil y meta (sexo, objetivo, ritmo, actividad, proteína) |
+| `body_measurements` | Mediciones corporales |
+| `user_portions` | Porciones propias por alimento |
+
+La foto se envía a la función, se analiza y se descarta: no se guarda ni en el dispositivo ni en Supabase. Lo único que queda son los ítems y los gramos.
+
+**Límite y costo.** Hay un tope de 40 análisis por día y por cuenta (día UTC); al pasarlo, la función responde 429. Cada análisis son dos llamadas a Claude, que se registran en `ai_usage` con tokens y costo. A los precios configurados en la función, el costo aproximado es de uno o dos centavos de dólar por análisis con foto, así que el tope diario queda por debajo de un dólar.
+
+**Limitaciones.**
+
+- La estimación de gramos por foto tiene un error típico de ±30 %. Pesar en la gramera es lo que la corrige.
+- Las comidas mixtas (guisos, sopas, arroces con todo) se descomponen en ingredientes a ojo y son las que más se desvían.
+- Los carbohidratos de la TCAC son totales (incluyen la fibra), no netos.
+
 ## Cuenta y sincronización
 
 La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la base de datos es la copia compartida. Con Supabase configurado, la app pide sesión al abrir; sin las variables, corre solo en local.
@@ -110,6 +146,54 @@ La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la ba
    | `.env.local` y Vercel | `VITE_ACCOUNTS` | `Miguel:correo1,Karen:correo2` (los mismos correos del paso 4) |
 
    Sin las dos `VITE_SUPABASE_*` no hay pantalla de inicio de sesión y la app funciona solo en local, como antes.
+
+### Función `nutrition` (Comida)
+
+Analiza las comidas con Claude. Hace falta una clave de Anthropic:
+
+1. **Secreto**:
+
+   ```bash
+   npx supabase secrets set ANTHROPIC_API_KEY=... --project-ref TU_REF
+   ```
+
+2. **Desplegar**:
+
+   ```bash
+   npx supabase functions deploy nutrition --project-ref TU_REF
+   ```
+
+   `supabase/config.toml` trae `verify_jwt = false` para `nutrition`: la función valida por su cuenta el JWT del usuario (`auth.getUser`) y responde los preflight de CORS.
+
+3. **Modelos**: están como constantes al inicio de `supabase/functions/nutrition/index.ts` (`VISION_MODEL`, `TEXT_MODEL`, `CHOICE_MODEL`). Antes de desplegar, confirma que esos ids existen con `GET /v1/models` de la API de Anthropic y ajústalos si hace falta.
+
+| Ruta | Qué hace |
+|---|---|
+| `POST /functions/v1/nutrition/analyze` | Recibe foto y/o nota de una comida y devuelve los ítems con gramos, cada uno anclado a una fila de `foods`. Requiere sesión; máximo 40 por día |
+
+### Migraciones de Comida
+
+```bash
+npx supabase db push
+```
+
+Aplica, además de las anteriores:
+
+- `20261110000000_nutrition.sql`: tablas nuevas, RLS, `partners` y la función `search_foods`. Es aditiva: no toca las tablas existentes, así que el cliente anterior sigue funcionando.
+- `20261110000001_foods_tcac.sql`: 314 alimentos de la TCAC.
+
+**Orden importante.** `supabase/deploy/partner_read.sql` no es una migración y no va en `db push`: se pega en el SQL Editor solo en el momento de desplegar el cliente nuevo. Cambia las políticas de `tasks`, `todos` y `day_modes` para que cada cuenta también lea las filas de su pareja. El cliente anterior hace el pull sin filtrar por `user_id` y se apoyaba en que el RLS solo devolvía filas propias; con esas políticas recibiría las de la pareja y las mezclaría con las suyas. Requiere haber aplicado antes `20261110000000_nutrition.sql` (usa `public.can_read`).
+
+**Alimentos USDA (opcional).** Amplía la tabla con alimentos genéricos de USDA FoodData Central, traducidos con Claude Haiku:
+
+```bash
+ANTHROPIC_API_KEY=... node supabase/seed/foods/build-usda-sql.mjs
+npx supabase db push
+```
+
+El script genera `supabase/migrations/20261110000002_foods_usda.sql`.
+
+**Parejas.** El seed de `partners` corre una sola vez, dentro de `20261110000000_nutrition.sql`, y empareja las cuentas que existan en ese momento. Si se crea una cuenta después, vuelve a ejecutar el `insert into public.partners ...` de ese archivo en el SQL Editor (no duplica filas).
 
 ## Notificaciones
 
@@ -210,21 +294,30 @@ src/
     ReportScreen          Reporte de constancia y rachas
     LoginScreen           Pantalla de entrada (nombre + contraseña)
     SettingsScreen        Cuenta, temas, notificaciones, importar/exportar
+    FoodScreen            Comida del día, check-in y totales contra la meta
+    ProfileScreen         Perfil, objetivo y metas
   components/             WeekStrip, DayModeBar, TaskCard, TaskEditor, TimePicker,
                           IconPicker, ScopeDialog, TodoRow, TabBar, StreakCalendar,
                           ProgressRing, EmptyState
+    food/                 Captura y revisión de comidas, editor de gramos, buscador
+                          de alimentos, check-in, hojas de sueño y entreno, totales
   storage/                Persistencia local, hook de estado, estadísticas,
                           importación JSON, modos de día (dayModes.ts) y
                           sincronización con Supabase (cloud.ts, syncQueue.ts,
                           useCloudSync.ts)
-  auth/                   Sesión de Supabase (correo + contraseña)
+  auth/                   Sesión de Supabase (correo + contraseña) y vista de la pareja
+                          (PartnerProvider)
+  lib/nutrition/          Metas, BMR, MET, matemática de comidas y cliente de /analyze
   lib/supabase.ts         Cliente de Supabase del navegador
   theme/                  Tokens, paletas de color, categorías, catálogo de iconos
                           y el componente Ionicons (fuente + glyph map)
   types/                  Modelo de datos
   utils/                  Fechas, sonido, vibración y notificaciones
 supabase/functions/push/  Edge Function de Web Push (subscribe, status, test, send)
-supabase/migrations/      Esquema SQL (tablas, RLS) y cron de envío; `supabase db push`
+supabase/functions/nutrition/  Edge Function de análisis de comidas con Claude (analyze)
+supabase/migrations/      Esquema SQL (tablas, RLS), cron de envío y alimentos; `supabase db push`
+supabase/deploy/          SQL que se aplica a mano al desplegar (partner_read.sql)
+supabase/seed/foods/      TCAC en CSV y generadores del SQL de alimentos (TCAC, USDA)
 supabase/config.toml      Config de la CLI (verify_jwt de la función)
 public/                   manifest.json, sw.js e íconos
 ```
