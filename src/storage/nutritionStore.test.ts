@@ -135,6 +135,7 @@ const meal: Meal = {
   ],
   source: 'photo',
   analysisId: 'an1',
+  photoPath: 'uid/m1.webp',
 };
 
 const portion: UserPortion = { id: 'arroz', ...sync, foodKey: 'arroz', grams: 180, samples: 3 };

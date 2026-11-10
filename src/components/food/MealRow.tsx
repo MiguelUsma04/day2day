@@ -12,6 +12,7 @@ import { fontFamily, fontSize, radius, spacing } from '../../theme/tokens';
 import type { Meal, MealSlot } from '../../types/nutrition';
 import { formatTime } from '../../utils/date';
 import * as Haptics from '../../utils/haptics';
+import { MealThumb } from './MealPhoto';
 
 /** Same feel as TaskCard: travel before the delete commits, and the slop before the swipe wins over scroll. */
 const THRESHOLD = 78;
@@ -122,9 +123,15 @@ export function MealRow({ meal, onPress, onDelete, readOnly = false }: Props) {
               },
             ]}
           >
-            <View style={[styles.icon, { backgroundColor: colors.muted }]}>
-              <Ionicons name={SLOT_ICONS[meal.slot]} size={18} color={colors.primary} />
-            </View>
+            <MealThumb
+              path={meal.photoPath}
+              size={44}
+              fallback={
+                <View style={[styles.icon, { backgroundColor: colors.muted }]}>
+                  <Ionicons name={SLOT_ICONS[meal.slot]} size={18} color={colors.primary} />
+                </View>
+              }
+            />
             <View style={styles.body}>
               <Text style={[styles.time, { color: colors.mutedForeground }]}>{formatTime(meal.timeMinutes)}</Text>
               <Text numberOfLines={1} style={[styles.title, { color: colors.foreground }]}>

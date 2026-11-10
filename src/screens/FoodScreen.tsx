@@ -13,6 +13,7 @@ import { TotalsCards } from '../components/food/TotalsCards';
 import { WeekStrip } from '../components/WeekStrip';
 import { defaultSlotMinutes, medianSlotMinutes, slotLabel } from '../lib/nutrition/format';
 import { dayTotals, slotForMinutes } from '../lib/nutrition/mealMath';
+import { cleanupOldMealPhotos, removeMealPhoto, uploadMealPhoto } from '../lib/nutrition/photos';
 import type { NutritionStore } from '../storage/useNutrition';
 import { Ionicons } from '../theme/Ionicons';
 import type { IconName } from '../theme/icons';
@@ -121,25 +122,42 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
     setEditor({ mode, slot: slotForMinutes(minutesSinceMidnight(new Date())) });
   }, []);
 
+  // The photo uploads after the meal is saved: a slow or failed upload never blocks the meal.
+  const attachPhoto = useCallback(
+    async (mealId: string, photo: Blob) => {
+      const path = await uploadMealPhoto(photo, mealId);
+      if (path) nutrition.updateMeal(mealId, { photoPath: path });
+    },
+    [nutrition],
+  );
+
   const saveMeal = useCallback(
-    (m: Omit<Meal, 'id' | 'createdAt' | 'updatedAt'> | Meal) => {
+    (m: Omit<Meal, 'id' | 'createdAt' | 'updatedAt'> | Meal, photo: Blob | null) => {
       if ('id' in m) {
         const { id, createdAt: _c, updatedAt: _u, ...fields } = m;
         nutrition.updateMeal(id, fields);
       } else {
-        nutrition.addMeal(m);
+        const saved = nutrition.addMeal(m);
+        if (photo) void attachPhoto(saved.id, photo);
       }
       setEditor(null);
     },
-    [nutrition],
+    [nutrition, attachPhoto],
   );
 
   const confirmRemoval = useCallback(() => {
     if (!confirmDelete) return;
     nutrition.deleteMeal(confirmDelete.id);
+    if (confirmDelete.photoPath) void removeMealPhoto(confirmDelete.photoPath);
     playDelete();
     setConfirmDelete(null);
   }, [confirmDelete, nutrition]);
+
+  // Photos older than the retention window go away, once a day per device.
+  useEffect(() => {
+    if (readOnly) return;
+    void cleanupOldMealPhotos(toDayKey(new Date()));
+  }, [readOnly]);
 
   // Until the stored data is loaded, an edit here would be overwritten by hydration.
   if (nutrition.isLoading) {

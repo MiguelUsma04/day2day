@@ -395,6 +395,7 @@ export type MealRow = SyncCols & {
   items: MealItem[];
   source: string;
   analysis_id: string | null;
+  photo_path: string | null;
   // Derived from items on write so the server can aggregate; ignored on read.
   kcal: number;
   protein_g: number;
@@ -454,6 +455,7 @@ export function normalizeMeal(raw: unknown): Meal | null {
     items,
     source: oneOf(MEAL_SOURCES, o.source) ? o.source : 'manual',
     analysisId: str(o.analysisId) ? o.analysisId : null,
+    photoPath: str(o.photoPath) && o.photoPath ? o.photoPath : null,
   };
 }
 
@@ -469,6 +471,7 @@ export function toMealRow(m: Meal, userId: string): MealRow {
     items: m.items,
     source: m.source,
     analysis_id: m.analysisId,
+    photo_path: m.photoPath,
     kcal: totals.kcal,
     protein_g: totals.proteinG,
     carbs_g: totals.carbsG,
@@ -488,6 +491,7 @@ export function fromMealRow(row: MealRow): Meal | null {
     items: row.items,
     source: row.source,
     analysisId: row.analysis_id,
+    photoPath: row.photo_path,
   });
 }
 

@@ -10,6 +10,7 @@ import { fileToJpegBase64 } from '../../utils/image';
 import { FoodSearch } from './FoodSearch';
 import { MealCaptureStep } from './MealCaptureStep';
 import { clearMealDraft, saveMealDraft } from './mealDraft';
+import { MealPhoto } from './MealPhoto';
 import { editorReducer, initialEditorState, title as titleOf } from './mealEditorState';
 import { MealReviewStep } from './MealReviewStep';
 import { PrimaryButton, Sheet } from './Sheet';
@@ -24,7 +25,8 @@ export type MealEditorProps = {
   meal?: Meal;
   portions: UserPortion[];
   recentFoods: string[];
-  onSave(meal: Omit<Meal, 'id' | 'createdAt' | 'updatedAt'> | Meal): void;
+  /** `photo` is the original file in photo mode; the screen stores a reduced copy. */
+  onSave(meal: Omit<Meal, 'id' | 'createdAt' | 'updatedAt'> | Meal, photo: Blob | null): void;
   onClose(): void;
   onRememberPortion(foodKey: string, grams: number): void;
   /** Prefills the note (used when resuming an unfinished draft). */
@@ -187,6 +189,7 @@ export function MealEditor({
       items: state.items,
       source: meal ? meal.source : mode === 'photo' ? ('photo' as const) : ('text' as const),
       analysisId,
+      photoPath: meal?.photoPath ?? null,
     };
     // Learn only weights entered in this session; re-saving an edited meal must not re-count old ones.
     const before = new Map((meal?.items ?? []).map((i) => [i.id, i]));
@@ -197,7 +200,7 @@ export function MealEditor({
       onRememberPortion(item.food.id, item.grams);
     }
     if (mode !== 'edit') void clearMealDraft();
-    onSave(meal ? { ...meal, ...fields } : fields);
+    onSave(meal ? { ...meal, ...fields } : fields, mode === 'photo' ? file : null);
   };
 
   const captureMode = mode === 'photo' ? 'photo' : 'text';
@@ -236,13 +239,16 @@ export function MealEditor({
       ) : step === 'search' ? (
         <FoodSearch onPick={addHit} onCancel={() => setStep(searchReturn)} />
       ) : (
-        <MealReviewStep
-          state={state}
-          dispatch={dispatch}
-          slot={slot}
-          onSlot={setSlot}
-          onAddItem={() => openSearch('review')}
-        />
+        <>
+          <MealPhoto uri={previewUrl} path={meal?.photoPath ?? null} />
+          <MealReviewStep
+            state={state}
+            dispatch={dispatch}
+            slot={slot}
+            onSlot={setSlot}
+            onAddItem={() => openSearch('review')}
+          />
+        </>
       )}
     </Sheet>
   );

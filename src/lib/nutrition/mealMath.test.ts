@@ -10,7 +10,7 @@ const item = (o: Partial<MealItem> = {}): MealItem => ({
 });
 const meal = (items: MealItem[], eatenPct: Meal['eatenPct'] = 100): Meal => ({
   id: 'm', createdAt: 0, updatedAt: 0, date: '2026-11-09', slot: 'lunch', timeMinutes: 760,
-  title: 'x', eatenPct, items, source: 'manual', analysisId: null,
+  title: 'x', eatenPct, items, source: 'manual', analysisId: null, photoPath: null,
 });
 
 test('scaleMacros rounds kcal to int and grams to 1 decimal', () => {

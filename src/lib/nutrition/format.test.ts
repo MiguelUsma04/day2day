@@ -14,6 +14,7 @@ const meal = (slot: MealSlot, timeMinutes: number): Meal => ({
   items: [],
   source: 'manual',
   analysisId: null,
+  photoPath: null,
 });
 
 test('medianSlotMinutes: none in the slot -> null', () => {

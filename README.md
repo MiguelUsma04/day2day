@@ -20,7 +20,7 @@ PWA web pura: React + react-native-web empaquetados con Vite, instalable en el i
 - **Reporte de constancia**: porcentaje cumplido, rachas, días perfectos, calendario de los últimos días y qué hábitos se te dan mejor o peor.
 - **Seis temas de color** (azul, rosa, lila, ámbar, verde, coral) que tiñen toda la interfaz —fondo, tarjetas y bordes incluidos—, más modo claro/oscuro/automático.
 - **Progreso diario** y marcador **"Ahora"** sobre la actividad en curso.
-- **Salud**: una pestaña para registrar lo que comes con una foto o con texto. Claude identifica los alimentos y los gramos; las kcal y los macros salen siempre de la tabla de alimentos (TCAC colombiana y USDA), nunca del modelo. Hace como máximo una pregunta, con chips para responder. El aceite de cocción va como ítem aparte, los gramos se editan para ajustarlos con la gramera y los totales del día se comparan con la meta. La foto no se guarda.
+- **Salud**: una pestaña para registrar lo que comes con una foto o con texto. Claude identifica los alimentos y los gramos; las kcal y los macros salen siempre de la tabla de alimentos (TCAC colombiana y USDA), nunca del modelo. Hace como máximo una pregunta, con chips para responder. El aceite de cocción va como ítem aparte, los gramos se editan para ajustarlos con la gramera y los totales del día se comparan con la meta. La foto se guarda reducida (640 px, WebP, ~30-50 KB) en Supabase Storage y se ve como miniatura en la lista.
 - **Check-in diario**: peso, sueño y entreno del día.
 - **Perfil y metas**: la meta diaria sale de una fórmula de gasto (Katch-McArdle si hay % de grasa medido, Mifflin-St Jeor si no), nunca baja de 1.200 kcal (mujer) ni 1.500 kcal (hombre), el ritmo semanal se limita a un rango según el objetivo y la proteína se calcula por kg según el objetivo (1,8 al bajar grasa, 1,6 al mantener, 2,0 al ganar músculo, salvo que se fije otra).
 - **Ver a la pareja**: en solo lectura. Se puede abrir su cronograma, pendientes y comida, y agregarle pendientes.
@@ -110,7 +110,7 @@ Qué se guarda (todo con RLS: cada cuenta solo escribe lo suyo y la pareja puede
 | `body_measurements` | Mediciones corporales |
 | `user_portions` | Porciones propias por alimento |
 
-La foto se envía a la función, se analiza y se descarta: no se guarda ni en el dispositivo ni en Supabase. Lo único que queda son los ítems y los gramos.
+La foto se envía a la función a 1000 px para el análisis. Al guardar la comida, el cliente sube una copia reducida (640 px, WebP, JPEG si el navegador no codifica WebP) al bucket privado `meal-photos`, bajo `{user_id}/{meal_id}.webp`, y guarda la ruta en `meals.photo_path`. La subida va después de guardar la comida y es de mejor esfuerzo: si falla (sin red, por ejemplo), la comida queda sin foto. Las fotos se ven con URLs firmadas de una hora; la pareja las lee por `can_read`. Al borrar la comida se borra la foto, y una vez al día el cliente elimina las fotos de más de 180 días. Con 10 fotos al día entre los dos, el bucket ronda los 55 MB en régimen, muy por debajo del 1 GB del plan gratuito.
 
 **Límite y costo.** Hay un tope de 40 análisis por día y por cuenta (día UTC); al pasarlo, la función responde 429. Cada análisis son dos llamadas a Claude, que se registran en `ai_usage` con tokens y costo. A los precios configurados en la función, el costo aproximado es de uno o dos centavos de dólar por análisis con foto, así que el tope diario queda por debajo de un dólar.
 
@@ -182,6 +182,7 @@ Aplica, además de las anteriores:
 - `20261110000000_nutrition.sql`: tablas nuevas, RLS, `partners` y la función `search_foods`. Es aditiva: no toca las tablas existentes, así que el cliente anterior sigue funcionando.
 - `20261110000001_foods_tcac.sql`: 314 alimentos de la TCAC.
 - `20261111000000_water_logs.sql`: agua tomada por día (`water_logs`), misma forma y RLS que `weights`. Aplícala **antes** de desplegar el cliente que la usa: el pull de nutrición falla mientras la tabla no exista.
+- `20261112000000_meal_photos.sql`: columna `meals.photo_path`, bucket privado `meal-photos` (máximo 500 KB por archivo, solo WebP y JPEG) y sus políticas en `storage.objects`. También va **antes** del cliente: sin la columna, el push de comidas falla.
 
 **Orden importante.** `supabase/deploy/partner_read.sql` no es una migración y no va en `db push`: se pega a mano en el SQL Editor. Cambia las políticas de `tasks`, `todos` y `day_modes` para que cada cuenta también lea las filas de su pareja. Requiere haber aplicado antes `20261110000000_nutrition.sql` (usa `public.can_read`).
 

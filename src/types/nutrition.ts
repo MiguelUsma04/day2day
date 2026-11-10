@@ -75,6 +75,8 @@ export type Meal = Synced & {
   items: MealItem[];
   source: 'photo' | 'text' | 'manual';
   analysisId: string | null;
+  /** Storage path of the reduced photo (`{userId}/{mealId}.webp`), or null. */
+  photoPath: string | null;
 };
 export type UserPortion = Synced & { foodKey: string; grams: number; samples: number }; // id = foodKey
 
