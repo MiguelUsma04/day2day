@@ -29,6 +29,7 @@ export type BodyMeasurement = Synced & {
 };
 export type Macros = { kcal: number; proteinG: number; carbsG: number; fatG: number };
 export type WeightEntry = Synced & { date: string; weightKg: number }; // id = date
+export type WaterLog = Synced & { date: string; ml: number }; // id = date
 export type SleepLog = Synced & {
   date: string;
   bedAtMinutes: number | null;

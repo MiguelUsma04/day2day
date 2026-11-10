@@ -8,6 +8,7 @@ import type {
   SleepLog,
   Synced,
   UserPortion,
+  WaterLog,
   WeightEntry,
   Workout,
 } from '../types/nutrition';
@@ -21,7 +22,8 @@ import type {
 export type ProfileFields = Omit<Profile, keyof Synced>;
 export type MeasurementFields = Omit<BodyMeasurement, keyof Synced>;
 export type SleepFields = Omit<SleepLog, keyof Synced | 'date'>;
-export type WorkoutDraft = Omit<Workout, keyof Synced | 'met' | 'kcalNet'>;
+/** `kcalNet` is optional: when the watch or the machine reports it, it replaces the MET estimate. */
+export type WorkoutDraft = Omit<Workout, keyof Synced | 'met' | 'kcalNet'> & { kcalNet?: number | null };
 export type MealFields = Omit<Meal, keyof Synced>;
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -73,6 +75,25 @@ export function clearWeightIn(list: WeightEntry[], date: string): WeightEntry[] 
   return deleteByIdIn(list, date);
 }
 
+// ---- Water (id = date) --------------------------------------------------
+
+/** Sets the day's total; a zero or negative total clears the day. */
+export function setWaterIn(list: WaterLog[], date: string, ml: number, now: number): WaterLog[] {
+  const total = Math.round(ml);
+  if (total <= 0) return deleteByIdIn(list, date);
+  return upsert(
+    list,
+    date,
+    (old) => ({ id: date, date, ml: total, createdAt: old?.createdAt ?? now, updatedAt: now }),
+    sameFields,
+  );
+}
+
+export function addWaterIn(list: WaterLog[], date: string, deltaMl: number, now: number): WaterLog[] {
+  const current = list.find((w) => w.id === date)?.ml ?? 0;
+  return setWaterIn(list, date, current + deltaMl, now);
+}
+
 // ---- Sleep (id = date) --------------------------------------------------
 
 /** When both bed and wake times are given, the duration is derived from them. */
@@ -110,11 +131,15 @@ export function addWorkoutIn(
   id: string,
   now: number,
 ): Workout[] {
+  const { kcalNet: reported, ...fields } = w;
   const workout: Workout = {
-    ...w,
+    ...fields,
     id,
     met: MET_TABLE[w.kind][w.intensity],
-    kcalNet: workoutKcal(w.kind, w.intensity, w.minutes, weightKg),
+    kcalNet:
+      typeof reported === 'number' && Number.isFinite(reported) && reported > 0
+        ? Math.round(reported)
+        : workoutKcal(w.kind, w.intensity, w.minutes, weightKg),
     createdAt: now,
     updatedAt: now,
   };

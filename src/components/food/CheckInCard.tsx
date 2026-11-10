@@ -5,26 +5,31 @@ import { formatKg } from '../../lib/nutrition/format';
 import { WORKOUT_LABELS } from '../../lib/nutrition/met';
 import { parseDecimal } from '../../lib/nutrition/parse';
 import { formatHours } from '../../lib/nutrition/sleep';
+import { formatLiters } from '../../lib/nutrition/water';
 import type { SleepFields, WorkoutDraft } from '../../storage/nutritionReducers';
 import { Ionicons } from '../../theme/Ionicons';
 import type { IconName } from '../../theme/icons';
 import { shadow } from '../../theme/shadows';
 import { useTheme } from '../../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../../theme/tokens';
-import type { SleepLog, WeightEntry, Workout } from '../../types/nutrition';
+import type { SleepLog, WaterLog, WeightEntry, Workout } from '../../types/nutrition';
 import * as Haptics from '../../utils/haptics';
 import { SleepSheet } from './SleepSheet';
+import { WaterSheet } from './WaterSheet';
 import { WorkoutSheet } from './WorkoutSheet';
 
 type Props = {
   date: string;
   weight: WeightEntry | null;
   sleep: SleepLog | null;
+  water: WaterLog | null;
   workouts: Workout[];
   /** Body weight for workout kcal estimates. */
   weightKg: number;
   onSetWeight: (kg: number) => void;
   onSetSleep: (log: SleepFields) => void;
+  onAddWater: (deltaMl: number) => void;
+  onSetWater: (ml: number) => void;
   onAddWorkout: (w: WorkoutDraft) => void;
   onDeleteWorkout: (id: string) => void;
   readOnly?: boolean;
@@ -36,15 +41,18 @@ function workoutSummary(workouts: Workout[]): string {
     : workouts.map((w) => `${WORKOUT_LABELS[w.kind]} ${w.minutes}'`).join(' · ');
 }
 
-/** Morning check-in: weight, sleep and workouts for the day. */
+/** Daily check-in: weight, sleep, water and workouts for the day. */
 export function CheckInCard({
   date,
   weight,
   sleep,
+  water,
   workouts,
   weightKg,
   onSetWeight,
   onSetSleep,
+  onAddWater,
+  onSetWater,
   onAddWorkout,
   onDeleteWorkout,
   readOnly = false,
@@ -54,7 +62,7 @@ export function CheckInCard({
   const [editingWeight, setEditingWeight] = useState(false);
   const [weightText, setWeightText] = useState('');
   const [invalid, setInvalid] = useState(false);
-  const [sheet, setSheet] = useState<'sleep' | 'workout' | null>(null);
+  const [sheet, setSheet] = useState<'sleep' | 'water' | 'workout' | null>(null);
   const shake = useRef(new Animated.Value(0)).current;
   const weightInput = useRef<TextInput>(null);
 
@@ -83,7 +91,8 @@ export function CheckInCard({
       >
         <Ionicons name="checkmark-circle" size={18} color={colors.accent} />
         <Text numberOfLines={1} style={[styles.collapsedText, { color: colors.foreground }]}>
-          {formatKg(weight.weightKg)} · {formatHours(sleep.durationMin)} · {workoutSummary(workouts)}
+          {formatKg(weight.weightKg)} · {formatHours(sleep.durationMin)} · {formatLiters(water?.ml ?? 0)} ·{' '}
+          {workoutSummary(workouts)}
         </Text>
         <Ionicons name="chevron-down" size={16} color={colors.mutedForeground} />
       </Pressable>
@@ -173,6 +182,13 @@ export function CheckInCard({
           disabled={readOnly}
         />
         <Cell
+          icon="water-outline"
+          label="Agua"
+          value={water ? formatLiters(water.ml) : null}
+          onPress={() => setSheet('water')}
+          disabled={readOnly && water === null}
+        />
+        <Cell
           icon="barbell-outline"
           label="Entreno"
           value={workouts.length > 0 ? workoutSummary(workouts) : null}
@@ -195,6 +211,15 @@ export function CheckInCard({
       ) : null}
 
       <SleepSheet visible={sheet === 'sleep'} sleep={sleep} onSave={onSetSleep} onClose={() => setSheet(null)} />
+      <WaterSheet
+        visible={sheet === 'water'}
+        water={water}
+        weightKg={weightKg}
+        readOnly={readOnly}
+        onAdd={onAddWater}
+        onSet={onSetWater}
+        onClose={() => setSheet(null)}
+      />
       <WorkoutSheet
         visible={sheet === 'workout'}
         date={date}
@@ -247,12 +272,12 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, gap: spacing.sm },
   collapsed: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: TOUCH_TARGET },
   collapsedText: { flex: 1, fontFamily: fontFamily.medium, fontSize: fontSize.footnote },
-  cells: { flexDirection: 'row', gap: spacing.sm },
+  cells: { flexDirection: 'row', gap: spacing.xs },
   cell: {
     flex: 1,
     borderWidth: 1,
     borderRadius: radius.md,
-    padding: spacing.sm,
+    padding: spacing.xs,
     gap: 2,
     minHeight: 76,
   },

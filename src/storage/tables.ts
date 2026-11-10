@@ -14,6 +14,7 @@ export const TABLES = [
   'body_measurements',
   'weights',
   'sleep_logs',
+  'water_logs',
   'workouts',
   'meals',
   'user_portions',

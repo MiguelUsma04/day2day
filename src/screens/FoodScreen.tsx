@@ -153,7 +153,7 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: headerTop + spacing.sm }]}>
-        <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>Comida</Text>
+        <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>Salud</Text>
         <Text style={[styles.title, { color: colors.foreground }]}>{friendlyDate(selectedDate)}</Text>
       </View>
 
@@ -183,10 +183,13 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
           date={dayKey}
           weight={nutrition.getWeightFor(dayKey)}
           sleep={nutrition.getSleepFor(dayKey)}
+          water={nutrition.getWaterFor(dayKey)}
           workouts={nutrition.getWorkoutsFor(dayKey)}
           weightKg={weightKg}
           onSetWeight={(kg) => nutrition.setWeight(dayKey, kg)}
           onSetSleep={(log) => nutrition.setSleep(dayKey, log)}
+          onAddWater={(ml) => nutrition.addWater(dayKey, ml)}
+          onSetWater={(ml) => nutrition.setWater(dayKey, ml)}
           onAddWorkout={(w) => nutrition.addWorkout(w, weightKg)}
           onDeleteWorkout={nutrition.deleteWorkout}
           readOnly={readOnly}

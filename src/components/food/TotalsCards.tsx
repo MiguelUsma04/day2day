@@ -47,6 +47,13 @@ export function TotalsCards({ totals, target, onOpenProfile, onInfo }: Props) {
           warnWhenOver
         />
         <TotalCard label="Proteína" value={totals.proteinG} target={target?.proteinG ?? null} unit="g" />
+        <TotalCard
+          label="Quemadas"
+          value={target?.tdee ?? 0}
+          target={null}
+          unit="kcal"
+          note={target ? burnedNote(target) : 'sin perfil'}
+        />
       </View>
       {target === null ? (
         <Pressable
@@ -63,18 +70,28 @@ export function TotalsCards({ totals, target, onOpenProfile, onInfo }: Props) {
   );
 }
 
+/** What the day's burn is made of: the base, plus logged workouts when there are any. */
+function burnedNote(t: DailyTarget): string {
+  const workouts = Math.round(t.workoutKcal);
+  const base = formatNumber(t.tdee - workouts);
+  return workouts > 0 ? `base ${base} + entrenos ${formatNumber(workouts)}` : 'base, sin entreno';
+}
+
 function TotalCard({
   label,
   value,
   target,
   unit,
   warnWhenOver = false,
+  note: fixedNote,
 }: {
   label: string;
   value: number;
   target: number | null;
   unit: string;
   warnWhenOver?: boolean;
+  /** Shown instead of the remaining/over note. */
+  note?: string;
 }) {
   const { colors, isDark } = useTheme();
   const remaining = target === null ? null : Math.round(target - value);
@@ -82,8 +99,8 @@ function TotalCard({
   const progress = target ? Math.min(1, value / target) : 0;
   const barColor = over && warnWhenOver ? WARNING : colors.primary;
 
-  let note: string | null = null;
-  if (remaining !== null) {
+  let note: string | null = fixedNote ?? null;
+  if (fixedNote === undefined && remaining !== null) {
     if (!over) note = `faltan ${formatNumber(remaining)} ${unit}`;
     else if (warnWhenOver) note = `te pasaste ${formatNumber(-remaining)} ${unit}`;
     else note = 'meta cumplida';

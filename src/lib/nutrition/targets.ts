@@ -22,6 +22,8 @@ export function proteinTarget(a: { goal: Goal; weightKg: number; proteinGPerKg: 
 export type DailyTarget = Macros & {
   tdee: number;
   bmr: number;
+  /** Net kcal of the day's logged workouts, already inside `tdee`. */
+  workoutKcal: number;
   floorApplied: boolean;
   method: 'measured' | 'katch' | 'mifflin';
 };
@@ -44,7 +46,7 @@ export function dailyTarget(a: {
   const proteinG = Math.round(proteinTarget({ goal: profile.goal, weightKg, proteinGPerKg: profile.proteinGPerKg }));
   const fatG = Math.round(0.8 * weightKg);
   const carbsG = Math.max(0, Math.round((kcal - 4 * proteinG - 9 * fatG) / 4));
-  return { kcal, proteinG, carbsG, fatG, tdee, bmr, floorApplied, method };
+  return { kcal, proteinG, carbsG, fatG, tdee, bmr, workoutKcal: a.workoutKcal, floorApplied, method };
 }
 
 /**

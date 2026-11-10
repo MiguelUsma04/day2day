@@ -5,6 +5,7 @@ import type {
   Profile,
   SleepLog,
   UserPortion,
+  WaterLog,
   WeightEntry,
   Workout,
 } from '../types/nutrition';
@@ -26,6 +27,7 @@ import {
   fromProfileRow,
   fromSleepLogRow,
   fromUserPortionRow,
+  fromWaterLogRow,
   fromWeightRow,
   fromWorkoutRow,
   normalizeBodyMeasurement,
@@ -33,6 +35,7 @@ import {
   normalizeProfile,
   normalizeSleepLog,
   normalizeUserPortion,
+  normalizeWaterLog,
   normalizeWeight,
   normalizeWorkout,
   toBodyMeasurementRow,
@@ -40,6 +43,7 @@ import {
   toProfileRow,
   toSleepLogRow,
   toUserPortionRow,
+  toWaterLogRow,
   toWeightRow,
   toWorkoutRow,
   type BodyMeasurementRow,
@@ -47,6 +51,7 @@ import {
   type ProfileRow,
   type SleepLogRow,
   type UserPortionRow,
+  type WaterLogRow,
   type WeightRow,
   type WorkoutRow,
 } from './nutritionStore';
@@ -77,6 +82,7 @@ export const COLLECTIONS: {
   body_measurements: CollectionDef<BodyMeasurement, BodyMeasurementRow>;
   weights: CollectionDef<WeightEntry, WeightRow>;
   sleep_logs: CollectionDef<SleepLog, SleepLogRow>;
+  water_logs: CollectionDef<WaterLog, WaterLogRow>;
   workouts: CollectionDef<Workout, WorkoutRow>;
   meals: CollectionDef<Meal, MealRow>;
   user_portions: CollectionDef<UserPortion, UserPortionRow>;
@@ -135,6 +141,14 @@ export const COLLECTIONS: {
     normalize: normalizeSleepLog,
     toRow: toSleepLogRow,
     fromRow: fromSleepLogRow,
+    onConflict: 'user_id,id',
+  },
+  water_logs: {
+    table: 'water_logs',
+    storageKey: NUTRITION_KEYS.water_logs,
+    normalize: normalizeWaterLog,
+    toRow: toWaterLogRow,
+    fromRow: fromWaterLogRow,
     onConflict: 'user_id,id',
   },
   workouts: {

@@ -14,7 +14,7 @@ export type TabId = (typeof TABS)[number];
 const META: Record<TabId, { label: string; icon: IconName; active: IconName }> = {
   schedule: { label: 'Cronograma', icon: 'calendar-outline', active: 'calendar' },
   todos: { label: 'Pendientes', icon: 'checkbox-outline', active: 'checkbox' },
-  food: { label: 'Comida', icon: 'restaurant-outline', active: 'restaurant' },
+  food: { label: 'Salud', icon: 'heart-outline', active: 'heart' },
   report: { label: 'Progreso', icon: 'stats-chart-outline', active: 'stats-chart' },
   settings: { label: 'Ajustes', icon: 'settings-outline', active: 'settings' },
 };

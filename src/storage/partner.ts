@@ -8,6 +8,7 @@ import type {
   Meal,
   Profile,
   SleepLog,
+  WaterLog,
   WeightEntry,
   Workout,
 } from '../types/nutrition';
@@ -32,6 +33,7 @@ export type PartnerSnapshot = {
   meals: Meal[];
   weights: WeightEntry[];
   sleepLogs: SleepLog[];
+  waterLogs: WaterLog[];
   workouts: Workout[];
   profile: Profile | null;
   measurements: BodyMeasurement[];
@@ -66,7 +68,7 @@ export async function fetchPartnerSnapshot(
 ): Promise<PartnerSnapshot> {
   if (!client) throw new Error('Sin conexión con el servidor');
   const c = COLLECTIONS;
-  const [tasks, todos, dayModes, meals, weights, sleepLogs, workouts, profiles, measurements] =
+  const [tasks, todos, dayModes, meals, weights, sleepLogs, waterLogs, workouts, profiles, measurements] =
     await Promise.all([
       fetchLive(client, c.tasks, partnerId),
       fetchLive(client, c.todos, partnerId),
@@ -74,13 +76,14 @@ export async function fetchPartnerSnapshot(
       fetchLive(client, c.meals, partnerId),
       fetchLive(client, c.weights, partnerId),
       fetchLive(client, c.sleep_logs, partnerId),
+      fetchLive(client, c.water_logs, partnerId),
       fetchLive(client, c.workouts, partnerId),
       fetchLive(client, c.profiles, partnerId),
       fetchLive(client, c.body_measurements, partnerId),
     ]);
   // The partner's own profile carries their user id; a leftover local one is a fallback.
   const profile = profiles.find((p) => p.id === partnerId) ?? profiles[0] ?? null;
-  return { tasks, todos, dayModes, meals, weights, sleepLogs, workouts, profile, measurements };
+  return { tasks, todos, dayModes, meals, weights, sleepLogs, waterLogs, workouts, profile, measurements };
 }
 
 /** Creates a todo straight in the partner's list; it reaches them on their next sync. */
@@ -127,7 +130,7 @@ const noop = () => {};
  * same helpers `useNutrition` uses, every mutator does nothing.
  */
 export function readOnlyNutritionStore(snapshot: PartnerSnapshot): NutritionStore {
-  const { profile, measurements, weights, sleepLogs, workouts, meals } = snapshot;
+  const { profile, measurements, weights, sleepLogs, waterLogs, workouts, meals } = snapshot;
   const trendPoints = emaTrend(weights);
   return {
     isLoading: false,
@@ -135,6 +138,7 @@ export function readOnlyNutritionStore(snapshot: PartnerSnapshot): NutritionStor
     measurements,
     weights,
     sleepLogs,
+    waterLogs,
     workouts,
     meals,
     portions: [],
@@ -146,6 +150,8 @@ export function readOnlyNutritionStore(snapshot: PartnerSnapshot): NutritionStor
     clearWeight: noop,
     setSleep: noop,
     clearSleep: noop,
+    setWater: noop,
+    addWater: noop,
     addWorkout: noop,
     deleteWorkout: noop,
     addMeal: (m) => ({ ...m, id: '', createdAt: 0, updatedAt: 0 }),
@@ -158,6 +164,7 @@ export function readOnlyNutritionStore(snapshot: PartnerSnapshot): NutritionStor
         .sort((a, b) => a.timeMinutes - b.timeMinutes || a.createdAt - b.createdAt),
     getWeightFor: (date) => weights.find((w) => w.id === date) ?? null,
     getSleepFor: (date) => sleepLogs.find((s) => s.id === date) ?? null,
+    getWaterFor: (date) => waterLogs.find((w) => w.id === date) ?? null,
     getWorkoutsFor: (date) => workouts.filter((w) => w.date === date),
     latestMeasurement: () => latestMeasurementOf(measurements),
     currentWeightKg: () => currentWeightOf(weights, measurements),

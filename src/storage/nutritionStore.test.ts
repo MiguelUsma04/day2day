@@ -17,6 +17,7 @@ import {
   fromProfileRow,
   fromSleepLogRow,
   fromUserPortionRow,
+  fromWaterLogRow,
   fromWeightRow,
   fromWorkoutRow,
   normalizeBodyMeasurement,
@@ -24,6 +25,7 @@ import {
   normalizeProfile,
   normalizeSleepLog,
   normalizeUserPortion,
+  normalizeWaterLog,
   normalizeWeight,
   normalizeWorkout,
   toBodyMeasurementRow,
@@ -31,6 +33,7 @@ import {
   toProfileRow,
   toSleepLogRow,
   toUserPortionRow,
+  toWaterLogRow,
   toWeightRow,
   toWorkoutRow,
 } from './nutritionStore';
@@ -202,6 +205,20 @@ describe('weight', () => {
       updatedAt: 7,
     });
     expect(normalizeWeight({ date: '2026-11-04' })).toBeNull();
+  });
+});
+
+describe('water log', () => {
+  it('round-trips through a row with id = date', () => {
+    const log = { id: '2026-11-10', date: '2026-11-10', ml: 1750, ...sync };
+    const row = toWaterLogRow(log, 'uid');
+    expect(row).toMatchObject({ id: '2026-11-10', user_id: 'uid', date: '2026-11-10', ml: 1750 });
+    expect(fromWaterLogRow(row)).toEqual(log);
+  });
+  it('rejects negatives and missing fields', () => {
+    expect(normalizeWaterLog({ date: '2026-11-10', ml: -1 })).toBeNull();
+    expect(normalizeWaterLog({ date: '2026-11-10' })).toBeNull();
+    expect(normalizeWaterLog({ date: '2026-11-10', ml: 499.6, createdAt: 3 })).toMatchObject({ ml: 500, updatedAt: 3 });
   });
 });
 

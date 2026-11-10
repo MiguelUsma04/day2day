@@ -15,6 +15,7 @@ import {
   type Profile,
   type SleepLog,
   type UserPortion,
+  type WaterLog,
   type WeightEntry,
   type Workout,
 } from '../types/nutrition';
@@ -24,6 +25,7 @@ export const NUTRITION_KEYS: Record<
   | 'body_measurements'
   | 'weights'
   | 'sleep_logs'
+  | 'water_logs'
   | 'workouts'
   | 'meals'
   | 'user_portions',
@@ -33,6 +35,7 @@ export const NUTRITION_KEYS: Record<
   body_measurements: 'day2day:body_measurements:v1',
   weights: 'day2day:weights:v1',
   sleep_logs: 'day2day:sleep_logs:v1',
+  water_logs: 'day2day:water_logs:v1',
   workouts: 'day2day:workouts:v1',
   meals: 'day2day:meals:v1',
   user_portions: 'day2day:user_portions:v1',
@@ -266,6 +269,24 @@ export function fromWeightRow(row: WeightRow): WeightEntry | null {
     date: row.date,
     weightKg: row.weight_kg,
   });
+}
+
+// ---- Water logs (id = date) -------------------------------------------
+
+export type WaterLogRow = SyncCols & { date: string; ml: number };
+
+export function normalizeWaterLog(raw: unknown): WaterLog | null {
+  const o = asObj(raw);
+  if (!o || !str(o.date) || !num(o.ml) || o.ml < 0) return null;
+  return { id: o.date, ...stamps(o), date: o.date, ml: Math.round(o.ml) };
+}
+
+export function toWaterLogRow(w: WaterLog, userId: string): WaterLogRow {
+  return { ...syncCols(w, userId), date: w.date, ml: w.ml };
+}
+
+export function fromWaterLogRow(row: WaterLogRow): WaterLog | null {
+  return normalizeWaterLog({ ...rowStamps(row), date: row.date, ml: row.ml });
 }
 
 // ---- Sleep logs (id = date) -------------------------------------------

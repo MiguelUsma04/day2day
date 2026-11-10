@@ -9,6 +9,7 @@ import type {
   Profile,
   SleepLog,
   UserPortion,
+  WaterLog,
   WeightEntry,
   Workout,
 } from '../types/nutrition';
@@ -16,6 +17,7 @@ import { createId } from '../utils/id';
 import { COLLECTIONS } from './collections';
 import {
   addMealIn,
+  addWaterIn,
   addWorkoutIn,
   clearSleepIn,
   clearWeightIn,
@@ -25,6 +27,7 @@ import {
   latestMeasurementOf,
   rememberPortionIn,
   setSleepIn,
+  setWaterIn,
   setWeightIn,
   updateMealIn,
   upsertMeasurementIn,
@@ -47,6 +50,7 @@ export type NutritionStore = {
   measurements: BodyMeasurement[];
   weights: WeightEntry[];
   sleepLogs: SleepLog[];
+  waterLogs: WaterLog[];
   workouts: Workout[];
   meals: Meal[];
   portions: UserPortion[];
@@ -58,6 +62,8 @@ export type NutritionStore = {
   clearWeight(date: string): void;
   setSleep(date: string, log: SleepFields): void;
   clearSleep(date: string): void;
+  setWater(date: string, ml: number): void;
+  addWater(date: string, deltaMl: number): void;
   addWorkout(w: WorkoutDraft, weightKg: number): void;
   deleteWorkout(id: string): void;
   addMeal(m: MealFields): Meal;
@@ -67,6 +73,7 @@ export type NutritionStore = {
   getMealsForDay(date: string): Meal[];
   getWeightFor(date: string): WeightEntry | null;
   getSleepFor(date: string): SleepLog | null;
+  getWaterFor(date: string): WaterLog | null;
   getWorkoutsFor(date: string): Workout[];
   latestMeasurement(): BodyMeasurement | null;
   currentWeightKg(): number | null;
@@ -110,6 +117,7 @@ export function useNutrition(userId: string | null): NutritionStore {
   const measurements = useCollection<BodyMeasurement>(COLLECTIONS.body_measurements.storageKey, hydrated);
   const weights = useCollection<WeightEntry>(COLLECTIONS.weights.storageKey, hydrated);
   const sleepLogs = useCollection<SleepLog>(COLLECTIONS.sleep_logs.storageKey, hydrated);
+  const waterLogs = useCollection<WaterLog>(COLLECTIONS.water_logs.storageKey, hydrated);
   const workouts = useCollection<Workout>(COLLECTIONS.workouts.storageKey, hydrated);
   const meals = useCollection<Meal>(COLLECTIONS.meals.storageKey, hydrated);
   const portions = useCollection<UserPortion>(COLLECTIONS.user_portions.storageKey, hydrated);
@@ -122,15 +130,17 @@ export function useNutrition(userId: string | null): NutritionStore {
       loadList(c.body_measurements.storageKey, c.body_measurements.normalize),
       loadList(c.weights.storageKey, c.weights.normalize),
       loadList(c.sleep_logs.storageKey, c.sleep_logs.normalize),
+      loadList(c.water_logs.storageKey, c.water_logs.normalize),
       loadList(c.workouts.storageKey, c.workouts.normalize),
       loadList(c.meals.storageKey, c.meals.normalize),
       loadList(c.user_portions.storageKey, c.user_portions.normalize),
-    ]).then(([p, m, w, s, wo, me, po]) => {
+    ]).then(([p, m, w, s, wa, wo, me, po]) => {
       if (!active || hydratedRef.current) return;
       profiles.setRaw(p);
       measurements.setRaw(m);
       weights.setRaw(w);
       sleepLogs.setRaw(s);
+      waterLogs.setRaw(wa);
       workouts.setRaw(wo);
       meals.setRaw(me);
       portions.setRaw(po);
@@ -153,6 +163,7 @@ export function useNutrition(userId: string | null): NutritionStore {
       { def: COLLECTIONS.body_measurements, items: measurements.items, setItems: measurements.setRaw },
       { def: COLLECTIONS.weights, items: weights.items, setItems: weights.setRaw },
       { def: COLLECTIONS.sleep_logs, items: sleepLogs.items, setItems: sleepLogs.setRaw },
+      { def: COLLECTIONS.water_logs, items: waterLogs.items, setItems: waterLogs.setRaw },
       { def: COLLECTIONS.workouts, items: workouts.items, setItems: workouts.setRaw },
       { def: COLLECTIONS.meals, items: meals.items, setItems: meals.setRaw },
       { def: COLLECTIONS.user_portions, items: portions.items, setItems: portions.setRaw },
@@ -253,6 +264,21 @@ export function useNutrition(userId: string | null): NutritionStore {
     [sleepLogs.set],
   );
 
+  const setWater = useCallback(
+    (date: string, ml: number) => {
+      const now = Date.now();
+      waterLogs.set((prev) => setWaterIn(prev, date, ml, now));
+    },
+    [waterLogs.set],
+  );
+  const addWater = useCallback(
+    (date: string, deltaMl: number) => {
+      const now = Date.now();
+      waterLogs.set((prev) => addWaterIn(prev, date, deltaMl, now));
+    },
+    [waterLogs.set],
+  );
+
   const addWorkout = useCallback(
     (w: WorkoutDraft, weightKg: number) => {
       const id = createId();
@@ -309,6 +335,10 @@ export function useNutrition(userId: string | null): NutritionStore {
     (date: string) => sleepLogs.items.find((s) => s.id === date) ?? null,
     [sleepLogs.items],
   );
+  const getWaterFor = useCallback(
+    (date: string) => waterLogs.items.find((w) => w.id === date) ?? null,
+    [waterLogs.items],
+  );
   const getWorkoutsFor = useCallback(
     (date: string) => workouts.items.filter((w) => w.date === date),
     [workouts.items],
@@ -342,6 +372,7 @@ export function useNutrition(userId: string | null): NutritionStore {
     measurements: measurements.items,
     weights: weights.items,
     sleepLogs: sleepLogs.items,
+    waterLogs: waterLogs.items,
     workouts: workouts.items,
     meals: meals.items,
     portions: portions.items,
@@ -353,6 +384,8 @@ export function useNutrition(userId: string | null): NutritionStore {
     clearWeight,
     setSleep,
     clearSleep,
+    setWater,
+    addWater,
     addWorkout,
     deleteWorkout,
     addMeal,
@@ -362,6 +395,7 @@ export function useNutrition(userId: string | null): NutritionStore {
     getMealsForDay,
     getWeightFor,
     getSleepFor,
+    getWaterFor,
     getWorkoutsFor,
     latestMeasurement,
     currentWeightKg,

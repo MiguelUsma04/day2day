@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { workoutKcal, WORKOUT_LABELS } from '../../lib/nutrition/met';
+import { parseDecimal } from '../../lib/nutrition/parse';
 import type { WorkoutDraft } from '../../storage/nutritionReducers';
 import { Ionicons } from '../../theme/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -38,6 +39,7 @@ export function WorkoutSheet({ visible, date, workouts, weightKg, readOnly = fal
   const [minutes, setMinutes] = useState(DEFAULT_MINUTES);
   const [intensity, setIntensity] = useState<WorkoutIntensity>('normal');
   const [confirm, setConfirm] = useState<Workout | null>(null);
+  const [kcalText, setKcalText] = useState('');
 
   // A fresh form every time the sheet opens.
   useEffect(() => {
@@ -45,9 +47,13 @@ export function WorkoutSheet({ visible, date, workouts, weightKg, readOnly = fal
     setKind('gym_strength');
     setMinutes(DEFAULT_MINUTES);
     setIntensity('normal');
+    setKcalText('');
   }, [visible]);
 
-  const kcal = workoutKcal(kind, intensity, minutes, weightKg);
+  const estimate = workoutKcal(kind, intensity, minutes, weightKg);
+  const reported = parseDecimal(kcalText);
+  const useReported = kcalText.trim() !== '' && reported !== null && reported > 0 && reported <= 5000;
+  const kcal = useReported ? Math.round(reported) : estimate;
 
   const step = (delta: number) => {
     void Haptics.selectionAsync();
@@ -56,7 +62,7 @@ export function WorkoutSheet({ visible, date, workouts, weightKg, readOnly = fal
 
   const add = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onAdd({ date, kind, minutes, intensity });
+    onAdd({ date, kind, minutes, intensity, kcalNet: useReported ? Math.round(reported) : null });
   };
 
   return (
@@ -65,7 +71,9 @@ export function WorkoutSheet({ visible, date, workouts, weightKg, readOnly = fal
         visible={visible}
         title="Entreno"
         onClose={onClose}
-        footer={readOnly ? null : <PrimaryButton label={`Agregar · ≈ ${kcal} kcal`} onPress={add} />}
+        footer={
+          readOnly ? null : <PrimaryButton label={`Agregar · ${useReported ? '' : '≈ '}${kcal} kcal`} onPress={add} />
+        }
       >
         {workouts.length > 0 ? (
           <View style={sheetStyles.field}>
@@ -132,7 +140,28 @@ export function WorkoutSheet({ visible, date, workouts, weightKg, readOnly = fal
                   <Chip key={i.id} label={i.label} active={i.id === intensity} onPress={() => setIntensity(i.id)} />
                 ))}
               </View>
-              <Text style={[styles.estimate, { color: colors.mutedForeground }]}>≈ {kcal} kcal</Text>
+              <Text style={[styles.estimate, { color: colors.mutedForeground }]}>≈ {estimate} kcal estimadas</Text>
+            </View>
+
+            <View style={sheetStyles.field}>
+              <Text style={[sheetStyles.label, { color: colors.foreground }]}>Calorías quemadas (opcional)</Text>
+              <View style={[styles.kcalRow, { borderColor: colors.border }]}>
+                <TextInput
+                  value={kcalText}
+                  onChangeText={setKcalText}
+                  inputMode="numeric"
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  placeholder={String(estimate)}
+                  placeholderTextColor={colors.mutedForeground}
+                  accessibilityLabel="Calorías quemadas según el reloj o la máquina"
+                  style={[styles.kcalInput, { color: colors.foreground }]}
+                />
+                <Text style={[styles.estimate, { color: colors.mutedForeground }]}>kcal</Text>
+              </View>
+              <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+                Si el reloj o la caminadora te dan el dato, escríbelo aquí y reemplaza la estimación.
+              </Text>
             </View>
           </>
         )}
@@ -180,4 +209,15 @@ const styles = StyleSheet.create({
   stepBtn: { width: TOUCH_TARGET, height: TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' },
   stepValue: { fontFamily: fontFamily.bold, fontSize: fontSize.body },
   estimate: { fontFamily: fontFamily.medium, fontSize: fontSize.label },
+  kcalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    minHeight: TOUCH_TARGET,
+  },
+  kcalInput: { flex: 1, fontFamily: fontFamily.semibold, fontSize: fontSize.body, paddingVertical: spacing.sm },
+  hint: { fontFamily: fontFamily.regular, fontSize: fontSize.caption, lineHeight: 16 },
 });

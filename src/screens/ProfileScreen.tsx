@@ -349,7 +349,7 @@ export function ProfileScreen({
               ) : (
                 <Text style={[styles.hint, { color: colors.mutedForeground }]}>
                   {valid
-                    ? 'Registra tu peso en Comida para ver tu meta.'
+                    ? 'Registra tu peso en Salud para ver tu meta.'
                     : 'Completa sexo, fecha de nacimiento y altura para ver tu meta.'}
                 </Text>
               )}

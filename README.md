@@ -20,7 +20,7 @@ PWA web pura: React + react-native-web empaquetados con Vite, instalable en el i
 - **Reporte de constancia**: porcentaje cumplido, rachas, días perfectos, calendario de los últimos días y qué hábitos se te dan mejor o peor.
 - **Seis temas de color** (azul, rosa, lila, ámbar, verde, coral) que tiñen toda la interfaz —fondo, tarjetas y bordes incluidos—, más modo claro/oscuro/automático.
 - **Progreso diario** y marcador **"Ahora"** sobre la actividad en curso.
-- **Comida**: una pestaña para registrar lo que comes con una foto o con texto. Claude identifica los alimentos y los gramos; las kcal y los macros salen siempre de la tabla de alimentos (TCAC colombiana y USDA), nunca del modelo. Hace como máximo una pregunta, con chips para responder. El aceite de cocción va como ítem aparte, los gramos se editan para ajustarlos con la gramera y los totales del día se comparan con la meta. La foto no se guarda.
+- **Salud**: una pestaña para registrar lo que comes con una foto o con texto. Claude identifica los alimentos y los gramos; las kcal y los macros salen siempre de la tabla de alimentos (TCAC colombiana y USDA), nunca del modelo. Hace como máximo una pregunta, con chips para responder. El aceite de cocción va como ítem aparte, los gramos se editan para ajustarlos con la gramera y los totales del día se comparan con la meta. La foto no se guarda.
 - **Check-in diario**: peso, sueño y entreno del día.
 - **Perfil y metas**: la meta diaria sale de una fórmula de gasto (Katch-McArdle si hay % de grasa medido, Mifflin-St Jeor si no), nunca baja de 1.200 kcal (mujer) ni 1.500 kcal (hombre), el ritmo semanal se limita a un rango según el objetivo y la proteína se calcula por kg según el objetivo (1,8 al bajar grasa, 1,6 al mantener, 2,0 al ganar músculo, salvo que se fije otra).
 - **Ver a la pareja**: en solo lectura. Se puede abrir su cronograma, pendientes y comida, y agregarle pendientes.
@@ -88,11 +88,11 @@ Cada sábado y domingo se marca desde el cronograma, en el selector bajo la tira
 
 > Genera un JSON con mi cronograma diario siguiendo este formato: una lista en la propiedad `tasks`, donde cada entrada tiene `title`, `time` en formato `"HH:MM"` de 24 horas, `duration` en minutos, `category` (`work`, `personal`, `health`, `study` u `other`), `icon` (nombre de Ionicons), `repeat` (`none`, `daily`, `weekdays` o `custom`), y `days` solo si es `custom`. Añade `reminder` con los minutos de antelación donde quiera un aviso.
 
-## Comida y cuerpo
+## Salud: comida y cuerpo
 
 Flujo de una comida, de punta a punta:
 
-1. En la pestaña **Comida** se toca un hueco (desayuno, almuerzo, etc.) y se toma o elige una foto, o se escribe lo que se comió.
+1. En la pestaña **Salud** se toca un hueco (desayuno, almuerzo, etc.) y se toma o elige una foto, o se escribe lo que se comió.
 2. La app llama a la Edge Function `nutrition`, que manda la foto (o el texto) a Claude para que devuelva solo alimentos y gramos.
 3. Por cada alimento, la función busca candidatos en la tabla `foods` con `search_foods` y una segunda llamada, más barata, elige el que corresponde. Las kcal y los macros se leen de esa fila. Si no hay candidato, el alimento queda como estimado por IA (`verified = false`) y se guarda en `user_foods`.
 4. Si algo es ambiguo, la respuesta trae una sola pregunta con chips. El aceite o la grasa de cocción aparece como ítem aparte.
@@ -147,7 +147,7 @@ La app es *local-first*: `AsyncStorage` sigue siendo la copia de trabajo y la ba
 
    Sin las dos `VITE_SUPABASE_*` no hay pantalla de inicio de sesión y la app funciona solo en local, como antes.
 
-### Función `nutrition` (Comida)
+### Función `nutrition` (Salud)
 
 Analiza las comidas con Claude. Hace falta una clave de Anthropic:
 
@@ -171,7 +171,7 @@ Analiza las comidas con Claude. Hace falta una clave de Anthropic:
 |---|---|
 | `POST /functions/v1/nutrition/analyze` | Recibe foto y/o nota de una comida y devuelve los ítems con gramos, cada uno anclado a una fila de `foods`. Requiere sesión; máximo 40 por día |
 
-### Migraciones de Comida
+### Migraciones de Salud
 
 ```bash
 npx supabase db push
@@ -181,10 +181,11 @@ Aplica, además de las anteriores:
 
 - `20261110000000_nutrition.sql`: tablas nuevas, RLS, `partners` y la función `search_foods`. Es aditiva: no toca las tablas existentes, así que el cliente anterior sigue funcionando.
 - `20261110000001_foods_tcac.sql`: 314 alimentos de la TCAC.
+- `20261111000000_water_logs.sql`: agua tomada por día (`water_logs`), misma forma y RLS que `weights`. Aplícala **antes** de desplegar el cliente que la usa: el pull de nutrición falla mientras la tabla no exista.
 
 **Orden importante.** `supabase/deploy/partner_read.sql` no es una migración y no va en `db push`: se pega a mano en el SQL Editor. Cambia las políticas de `tasks`, `todos` y `day_modes` para que cada cuenta también lea las filas de su pareja. Requiere haber aplicado antes `20261110000000_nutrition.sql` (usa `public.can_read`).
 
-**Cuándo correrlo: solo después de que LOS DOS teléfonos hayan abierto la versión nueva.** Compruébalo en cada app instalada: la pestaña **Comida** tiene que verse en ambas. Si en alguna todavía no aparece, ciérrala del todo y vuelve a abrirla (o recárgala) hasta que la muestre, y solo entonces corre el SQL. El motivo: una PWA instalada que se retoma desde segundo plano sin recargar sigue ejecutando el bundle anterior aunque el despliegue ya esté hecho. Ese cliente viejo hace el pull sin filtrar por `user_id` y se apoyaba en que el RLS solo devolvía filas propias; con las políticas nuevas recibiría las filas de la pareja, las mezclaría en su almacenamiento local y después fallaría cada flush al intentar subirlas como propias.
+**Cuándo correrlo: solo después de que LOS DOS teléfonos hayan abierto la versión nueva.** Compruébalo en cada app instalada: la pestaña **Salud** tiene que verse en ambas. Si en alguna todavía no aparece, ciérrala del todo y vuelve a abrirla (o recárgala) hasta que la muestre, y solo entonces corre el SQL. El motivo: una PWA instalada que se retoma desde segundo plano sin recargar sigue ejecutando el bundle anterior aunque el despliegue ya esté hecho. Ese cliente viejo hace el pull sin filtrar por `user_id` y se apoyaba en que el RLS solo devolvía filas propias; con las políticas nuevas recibiría las filas de la pareja, las mezclaría en su almacenamiento local y después fallaría cada flush al intentar subirlas como propias.
 
 **Alimentos USDA (opcional).** Amplía la tabla con alimentos genéricos de USDA FoodData Central, traducidos con Claude Haiku:
 
@@ -296,7 +297,7 @@ src/
     ReportScreen          Reporte de constancia y rachas
     LoginScreen           Pantalla de entrada (nombre + contraseña)
     SettingsScreen        Cuenta, temas, notificaciones, importar/exportar
-    FoodScreen            Comida del día, check-in y totales contra la meta
+    FoodScreen            Pestaña Salud: comidas del día, check-in y totales contra la meta
     ProfileScreen         Perfil, objetivo y metas
   components/             WeekStrip, DayModeBar, TaskCard, TaskEditor, TimePicker,
                           IconPicker, ScopeDialog, TodoRow, TabBar, StreakCalendar,

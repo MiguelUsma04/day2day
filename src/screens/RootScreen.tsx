@@ -31,6 +31,7 @@ const EMPTY_SNAPSHOT: PartnerSnapshot = {
   meals: [],
   weights: [],
   sleepLogs: [],
+  waterLogs: [],
   workouts: [],
   profile: null,
   measurements: [],

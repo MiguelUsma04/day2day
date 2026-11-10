@@ -2,10 +2,12 @@ import { expect, test } from 'vitest';
 
 import type { BodyMeasurement, Profile, UserPortion, WeightEntry } from '../types/nutrition';
 import {
+  addWaterIn,
   addWorkoutIn,
   clearWeightIn,
   computeTarget,
   rememberPortionIn,
+  setWaterIn,
   setWeightIn,
   upsertProfileIn,
 } from './nutritionReducers';
@@ -47,6 +49,26 @@ test('rememberPortionIn averages the grams', () => {
   ]);
   const second = rememberPortionIn(first, 'tcac:arroz', 200, 20);
   expect(second[0]).toMatchObject({ grams: 190, samples: 2, createdAt: 10 });
+});
+
+test('setWaterIn and addWaterIn keep one record per day and clear at zero', () => {
+  const one = addWaterIn([], '2026-11-10', 250, 10);
+  expect(one).toEqual([{ id: '2026-11-10', date: '2026-11-10', ml: 250, createdAt: 10, updatedAt: 10 }]);
+  const two = addWaterIn(one, '2026-11-10', 500, 20);
+  expect(two).toHaveLength(1);
+  expect(two[0]).toMatchObject({ ml: 750, createdAt: 10, updatedAt: 20 });
+  expect(setWaterIn(two, '2026-11-10', 750, 30)).toBe(two);
+  expect(addWaterIn(two, '2026-11-10', -750, 40)).toEqual([]);
+  expect(setWaterIn(two, '2026-11-10', 1234.4, 50)[0].ml).toBe(1234);
+});
+
+test('addWorkoutIn uses the reported kcal when given, else the MET estimate', () => {
+  const draft = { date: '2026-11-09', kind: 'treadmill' as const, intensity: 'normal' as const, minutes: 30 };
+  expect(addWorkoutIn([], { ...draft, kcalNet: 212.6 }, 59, 'a', 1)[0].kcalNet).toBe(213);
+  expect(addWorkoutIn([], { ...draft, kcalNet: null }, 59, 'b', 1)[0].kcalNet).toBe(
+    addWorkoutIn([], draft, 59, 'c', 1)[0].kcalNet,
+  );
+  expect(addWorkoutIn([], { ...draft, kcalNet: 0 }, 59, 'd', 1)[0]).not.toHaveProperty('kcalNet', 0);
 });
 
 test('addWorkoutIn computes met and kcalNet', () => {
