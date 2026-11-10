@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useHeaderInset } from '../components/HeaderInset';
 import { CheckInCard } from '../components/food/CheckInCard';
+import { CoachCard } from '../components/food/CoachCard';
 import { EmptySlotRow } from '../components/food/EmptySlotRow';
 import { MealEditor, type MealEditorMode } from '../components/food/MealEditor';
 import { clearMealDraft, readMealDraft, type MealDraft } from '../components/food/mealDraft';
@@ -12,6 +13,7 @@ import { TargetInfoSheet } from '../components/food/TargetInfoSheet';
 import { TotalsCards } from '../components/food/TotalsCards';
 import { WeekStrip } from '../components/WeekStrip';
 import { defaultSlotMinutes, medianSlotMinutes, slotLabel } from '../lib/nutrition/format';
+import { coachAdvice } from '../lib/nutrition/coach';
 import { dayTotals, slotForMinutes } from '../lib/nutrition/mealMath';
 import { cleanupOldMealPhotos, removeMealPhoto, uploadMealPhoto } from '../lib/nutrition/photos';
 import type { NutritionStore } from '../storage/useNutrition';
@@ -20,7 +22,7 @@ import type { IconName } from '../theme/icons';
 import { useTheme } from '../theme/ThemeProvider';
 import { fontFamily, fontSize, radius, spacing, TOUCH_TARGET } from '../theme/tokens';
 import { MEAL_SLOTS, type Meal, type MealSlot } from '../types/nutrition';
-import { addDays, friendlyDate, fromDayKey, minutesSinceMidnight, toDayKey } from '../utils/date';
+import { addDays, friendlyDate, fromDayKey, isToday, minutesSinceMidnight, toDayKey } from '../utils/date';
 import * as Haptics from '../utils/haptics';
 import { playDelete } from '../utils/sound';
 
@@ -84,6 +86,16 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
   const totals = dayTotals(meals);
   const target = nutrition.targetFor(dayKey);
   const weightKg = nutrition.currentWeightKg() ?? FALLBACK_WEIGHT_KG;
+  // Only today gets advice: a past day cannot be closed any more.
+  const advice = isToday(dayKey)
+    ? coachAdvice({
+        eaten: totals,
+        target,
+        weightKg,
+        nowMinutes: minutesSinceMidnight(new Date()),
+        mealsLogged: meals.length,
+      })
+    : null;
 
   const timeline = useMemo<TimelineEntry[]>(() => {
     const entries: TimelineEntry[] = meals.map((meal) => ({ kind: 'meal', minutes: meal.timeMinutes, meal }));
@@ -214,6 +226,8 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
         />
 
         <TotalsCards totals={totals} target={target} onOpenProfile={onOpenProfile} onInfo={() => setInfoOpen(true)} />
+
+        {advice ? <CoachCard advice={advice} /> : null}
 
         <View style={styles.timeline}>
           {timeline.map((entry) =>
