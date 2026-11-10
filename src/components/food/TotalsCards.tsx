@@ -16,14 +16,28 @@ type Props = {
   totals: Macros;
   target: DailyTarget | null;
   onOpenProfile: () => void;
+  /** Opens the explanation of how the target is computed. */
+  onInfo: () => void;
 };
 
 /** Calories and protein eaten today against the daily target. */
-export function TotalsCards({ totals, target, onOpenProfile }: Props) {
+export function TotalsCards({ totals, target, onOpenProfile, onInfo }: Props) {
   const { colors } = useTheme();
 
   return (
     <View style={styles.wrap}>
+      <View style={styles.head}>
+        <Text style={[styles.headText, { color: colors.mutedForeground }]}>Tu meta de hoy</Text>
+        <Pressable
+          onPress={onInfo}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Cómo se calcula tu meta"
+          style={({ pressed }) => [styles.infoBtn, { opacity: pressed ? 0.6 : 1 }]}
+        >
+          <Ionicons name="information-circle-outline" size={20} color={colors.mutedForeground} />
+        </Pressable>
+      </View>
       <View style={styles.row}>
         <TotalCard
           label="Calorías"
@@ -101,6 +115,9 @@ function TotalCard({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
+  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
+  headText: { fontFamily: fontFamily.semibold, fontSize: fontSize.caption, textTransform: 'uppercase', letterSpacing: 0.6 },
+  infoBtn: { width: 28, height: 28, alignItems: 'flex-end', justifyContent: 'center' },
   row: { flexDirection: 'row', gap: spacing.sm },
   card: { flex: 1, borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, gap: spacing.xs },
   label: { fontFamily: fontFamily.medium, fontSize: fontSize.caption },

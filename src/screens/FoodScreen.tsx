@@ -8,6 +8,7 @@ import { EmptySlotRow } from '../components/food/EmptySlotRow';
 import { MealEditor, type MealEditorMode } from '../components/food/MealEditor';
 import { clearMealDraft, readMealDraft, type MealDraft } from '../components/food/mealDraft';
 import { MealRow } from '../components/food/MealRow';
+import { TargetInfoSheet } from '../components/food/TargetInfoSheet';
 import { TotalsCards } from '../components/food/TotalsCards';
 import { WeekStrip } from '../components/WeekStrip';
 import { defaultSlotMinutes, medianSlotMinutes, slotLabel } from '../lib/nutrition/format';
@@ -50,6 +51,7 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Meal | null>(null);
   const [draft, setDraft] = useState<MealDraft | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // A meal analysis interrupted by closing the app leaves a draft behind.
   useEffect(() => {
@@ -190,7 +192,7 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
           readOnly={readOnly}
         />
 
-        <TotalsCards totals={totals} target={target} onOpenProfile={onOpenProfile} />
+        <TotalsCards totals={totals} target={target} onOpenProfile={onOpenProfile} onInfo={() => setInfoOpen(true)} />
 
         <View style={styles.timeline}>
           {timeline.map((entry) =>
@@ -226,6 +228,14 @@ export function FoodScreen({ selectedDate, onSelectDate, markedDays, nutrition, 
           <CaptureButton icon="create-outline" label="Texto" onPress={() => openCapture('text')} />
         </View>
       )}
+
+      <TargetInfoSheet
+        visible={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        target={target}
+        profile={nutrition.profile}
+        weightKg={weightKg}
+      />
 
       <ConfirmDialog
         visible={confirmDelete !== null}
