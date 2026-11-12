@@ -14,7 +14,8 @@ export type QueueOp = { op: 'upsert' } | { op: 'delete'; at: number };
 
 type Stored = Record<Table, Record<string, QueueOp>>;
 
-const KEY = 'day2day:syncQueue:v1';
+export const QUEUE_KEY = 'day2day:syncQueue:v1';
+const KEY = QUEUE_KEY;
 
 const queue = Object.fromEntries(TABLES.map((t) => [t, {}])) as Stored;
 /**
@@ -48,6 +49,19 @@ async function readStored(): Promise<void> {
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Forgets every queued change, in memory and on the way to disk. For when the
+ * local data changes hands: one account's pending edits must never be uploaded
+ * under another's id. The caller removes the stored copy.
+ */
+export function resetQueue(): void {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = null;
+  for (const table of TABLES) queue[table] = {};
+  loading = null;
+}
+
 function persist() {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {

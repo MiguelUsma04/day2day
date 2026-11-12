@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,12 +7,30 @@ import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { PartnerProvider } from './src/auth/PartnerProvider';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RootScreen } from './src/screens/RootScreen';
+import { claimLocalData } from './src/storage/localOwner';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { PHONE_MAX_WIDTH } from './src/theme/tokens';
 
 function Themed() {
   const { colors, isDark } = useTheme();
   const auth = useAuth();
+  const userId = auth.user?.id ?? null;
+
+  // The local store holds one account at a time. Before the app hydrates from
+  // it, make sure what is there belongs to whoever just signed in; otherwise
+  // the previous account's routine would show up mixed into this one's.
+  const [claimedFor, setClaimedFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    void claimLocalData(userId).then(() => {
+      if (active) setClaimedFor(userId);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+  const claiming = userId !== null && claimedFor !== userId;
   const { width } = useWindowDimensions();
   // Wider than a phone: keep the phone layout and centre it, with a hairline
   // on each side so the frame reads as a frame and not as a cut-off page.
@@ -31,7 +49,7 @@ function Themed() {
   // session is read first (spinner), then either the login or the app. Without
   // Supabase variables there is nothing to log into and the app runs local-only.
   let body: React.ReactNode;
-  if (auth.loading) {
+  if (auth.loading || claiming) {
     body = (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={colors.primary} />
@@ -40,7 +58,8 @@ function Themed() {
   } else if (auth.configured && !auth.user) {
     body = <LoginScreen />;
   } else {
-    body = <RootScreen />;
+    // Keyed by account so no in-memory state survives a switch either.
+    body = <RootScreen key={userId ?? 'local'} />;
   }
 
   return (
